@@ -1,0 +1,19 @@
+# Don't commit uploads
+uploads/
+highlights/
+*.mp4
+*.avi
+*.mkv
+*.mov
+
+# Database
+*.db
+
+# Python
+__pycache__/
+*.pyc
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
