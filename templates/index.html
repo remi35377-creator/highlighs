@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Highlight AI - Video Intelligence</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/platform.js" async defer></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tertiary: #1a1a25;
+            --bg-card: #15151f;
+            --accent-purple: #8b5cf6;
+            --accent-purple-light: #a78bfa;
+            --accent-lilac: #c084fc;
+            --accent-pink: #ec4899;
+            --text-primary: #ffffff;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            --border-subtle: rgba(139, 92, 246, 0.15);
+            --border-glow: rgba(139, 92, 246, 0.4);
+            --gradient-main: linear-gradient(135deg, #8b5cf6 0%, #c084fc 50%, #ec4899 100%);
+            --shadow-glow: 0 0 60px rgba(139, 92, 246, 0.3);
+        }
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .logo { display: flex; align-items: center; gap: 12px; }
+        .logo-icon {
+            width: 44px; height: 44px;
+            background: var(--gradient-main);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+        }
+        .logo-text { font-size: 22px; font-weight: 700; background: var(--gradient-main); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .user-section { display: flex; align-items: center; gap: 12px; }
+        .user-avatar {
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            background: var(--bg-tertiary);
+            cursor: pointer;
+            overflow: hidden;
+        }
+        .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .user-name { font-size: 14px; color: var(--text-secondary); }
+        
+        /* Tabs */
+        .tabs { display: flex; gap: 8px; margin: 30px 0; }
+        .tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            color: var(--text-secondary);
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Outfit', sans-serif;
+        }
+        .tab:hover { color: var(--text-primary); }
+        .tab.active {
+            background: rgba(139, 92, 246, 0.15);
+            color: var(--accent-purple-light);
+            border-color: var(--border-subtle);
+        }
+        
+        /* Sections */
+        .section { display: none; }
+        .section.active { display: block; }
+        
+        /* Upload Section */
+        .upload-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 30px; }
+        .upload-card {
+            background: var(--bg-card);
+            border: 2px dashed var(--border-glow);
+            border-radius: 16px;
+            padding: 40px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.4s;
+        }
+        .upload-card:hover {
+            border-color: var(--accent-purple);
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-glow);
+        }
+        .upload-card-icon { font-size: 40px; margin-bottom: 16px; }
+        .upload-card h3 { font-size: 18px; margin-bottom: 8px; }
+        .upload-card p { font-size: 14px; color: var(--text-muted); }
+        
+        /* URL Input */
+        .url-input-section { margin-top: 30px; display: none; }
+        .url-input-section.active { display: block; }
+        .input-group {
+            display: flex;
+            gap: 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 12px;
+            padding: 4px;
+        }
+        .input-group input {
+            flex: 1;
+            padding: 14px 16px;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-size: 15px;
+            font-family: 'Outfit', sans-serif;
+        }
+        .input-group input:focus { outline: none; }
+        .input-group input::placeholder { color: var(--text-muted); }
+        .input-group button {
+            padding: 14px 28px;
+            background: var(--gradient-main);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Outfit', sans-serif;
+        }
+        
+        /* Progress */
+        .upload-progress {
+            margin-top: 30px;
+            padding: 24px;
+            background: var(--bg-card);
+            border-radius: 16px;
+            display: none;
+        }
+        .upload-progress.active { display: block; }
+        .progress-header { display: flex; justify-content: space-between; margin-bottom: 12px; }
+        .progress-filename { font-weight: 500; }
+        .progress-percent { color: var(--accent-purple-light); font-family: monospace; }
+        .progress-bar {
+            height: 8px;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: var(--gradient-main);
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+        
+        /* Analysis Dashboard */
+        .dashboard { margin-top: 40px; }
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 20px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border-subtle);
+        }
+        .file-icon {
+            width: 48px; height: 48px;
+            background: rgba(139, 92, 246, 0.15);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+        .file-details .name { font-weight: 600; margin-bottom: 4px; }
+        .file-details .meta { font-size: 13px; color: var(--text-muted); font-family: monospace; }
+        
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+        .metric-card {
+            background: var(--bg-card);
+            border-radius: 14px;
+            padding: 20px;
+            border: 1px solid var(--border-subtle);
+            transition: all 0.3s;
+        }
+        .metric-card:hover { transform: translateY(-3px); border-color: var(--border-glow); }
+        .metric-title { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+        .metric-value {
+            font-size: 28px;
+            font-weight: 700;
+            background: var(--gradient-main);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .metric-bar {
+            margin-top: 12px;
+            height: 4px;
+            background: var(--bg-tertiary);
+            border-radius: 2px;
+        }
+        .metric-bar-fill {
+            height: 100%;
+            background: var(--gradient-main);
+            border-radius: 2px;
+            transition: width 1s;
+        }
+        
+        /* Highlights */
+        .highlights-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .highlight-card {
+            background: var(--bg-card);
+            border-radius: 14px;
+            overflow: hidden;
+            border: 1px solid var(--border-subtle);
+            transition: all 0.4s;
+        }
+        .highlight-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(139, 92, 246, 0.15);
+            border-color: var(--border-glow);
+        }
+        .highlight-video {
+            height: 160px;
+            background: var(--bg-tertiary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .highlight-play {
+            width: 50px; height: 50px;
+            background: rgba(139, 92, 246, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            transition: all 0.3s;
+        }
+        .highlight-card:hover .highlight-play {
+            background: var(--gradient-main);
+            transform: scale(1.1);
+        }
+        .highlight-duration {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            padding: 4px 8px;
+            background: rgba(0,0,0,0.8);
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: monospace;
+        }
+        .highlight-score {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            padding: 6px 10px;
+            background: rgba(139, 92, 246, 0.9);
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .highlight-content { padding: 16px; }
+        .highlight-metrics {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .highlight-metric {
+            padding: 4px 10px;
+            background: var(--bg-tertiary);
+            border-radius: 6px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+        .highlight-metric span { color: var(--accent-purple-light); font-weight: 600; }
+        .highlight-title { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+        .highlight-desc { font-size: 13px; color: var(--text-muted); line-height: 1.4; }
+        .highlight-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 14px;
+        }
+        .action-btn {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid var(--border-subtle);
+            border-radius: 8px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Outfit', sans-serif;
+        }
+        .action-btn:hover {
+            border-color: var(--accent-purple);
+            color: var(--text-primary);
+            background: rgba(139, 92, 246, 0.1);
+        }
+        
+        /* Rating */
+        .rating-card {
+            margin-top: 30px;
+            padding: 24px;
+            background: var(--bg-card);
+            border-radius: 14px;
+            border: 1px solid var(--border-subtle);
+            display: none;
+        }
+        .rating-card.active { display: block; }
+        .rating-card h4 { margin-bottom: 16px; }
+        .rating-buttons { display: flex; gap: 12px; margin-bottom: 16px; }
+        .rating-btn {
+            flex: 1;
+            padding: 14px;
+            border: 2px solid var(--border-subtle);
+            border-radius: 10px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Outfit', sans-serif;
+        }
+        .rating-btn.good { border-color: #22c55e; }
+        .rating-btn.good:hover, .rating-btn.good.active {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+        }
+        .rating-btn.bad { border-color: #ef4444; }
+        .rating-btn.bad:hover, .rating-btn.bad.active {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+        }
+        .rating-textarea {
+            width: 100%;
+            padding: 14px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-subtle);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: 'Outfit', sans-serif;
+            min-height: 80px;
+            resize: vertical;
+        }
+        .rating-textarea:focus { outline: none; border-color: var(--accent-purple); }
+        .submit-btn {
+            margin-top: 14px;
+            padding: 12px 24px;
+            background: var(--gradient-main);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'Outfit', sans-serif;
+        }
+        .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        /* History */
+        .history-list { display: flex; flex-direction: column; gap: 12px; }
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            border: 1px solid var(--border-subtle);
+        }
+        .history-info { display: flex; align-items: center; gap: 14px; }
+        .history-icon {
+            width: 44px; height: 44px;
+            background: rgba(139, 92, 246, 0.15);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .history-name { font-weight: 500; margin-bottom: 4px; }
+        .history-meta { font-size: 13px; color: var(--text-muted); }
+        .history-status {
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .history-status.completed {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+        }
+        .history-status.processing {
+            background: rgba(139, 92, 246, 0.15);
+            color: var(--accent-purple-light);
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+        .empty-icon { font-size: 48px; margin-bottom: 16px; }
+        
+        /* Loading */
+        .loading { text-align: center; padding: 40px; }
+        .spinner {
+            width: 40px; height: 40px;
+            border: 3px solid var(--bg-tertiary);
+            border-top-color: var(--accent-purple);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        @media (max-width: 768px) {
+            .upload-grid { grid-template-columns: 1fr; }
+            .header { flex-direction: column; gap: 16px; }
+            .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">⚡</div>
+                <div class="logo-text">Highlight AI</div>
+            </div>
+            <div class="user-section" id="user-section">
+                <div id="google-btn"></div>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('upload')">Upload</button>
+            <button class="tab" onclick="showTab('history')">Verlauf</button>
+        </div>
+
+        <!-- Upload Section -->
+        <section id="upload-section" class="section active">
+            <h2 style="font-size: 28px; margin-bottom: 8px;">Video hochladen</h2>
+            <p style="color: var(--text-secondary);">Wähle eine Methode zum Hochladen</p>
+
+            <div class="upload-grid">
+                <div class="upload-card" onclick="document.getElementById('file-input').click()">
+                    <div class="upload-card-icon">💾</div>
+                    <h3>Dateiupload</h3>
+                    <p>Video von deinem Gerät</p>
+                    <input type="file" id="file-input" accept="video/*" style="display:none" onchange="handleFileUpload(event)">
+                </div>
+                <div class="upload-card" onclick="showUrlInput()">
+                    <div class="upload-card-icon">🔗</div>
+                    <h3>URL Import</h3>
+                    <p>Video von Web-URL</p>
+                </div>
+                <div class="upload-card" onclick="alert('Cloud-Upload coming soon')">
+                    <div class="upload-card-icon">☁️</div>
+                    <h3>Cloud Import</h3>
+                    <p>Von Google Drive, etc.</p>
+                </div>
+            </div>
+
+            <div class="url-input-section" id="url-section">
+                <div class="input-group">
+                    <input type="url" id="url-input" placeholder="Video URL eingeben...">
+                    <button onclick="handleUrlUpload()">Hochladen</button>
+                </div>
+            </div>
+
+            <div class="upload-progress" id="upload-progress">
+                <div class="progress-header">
+                    <span class="progress-filename" id="progress-filename"></span>
+                    <span class="progress-percent" id="progress-percent">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+                </div>
+                <p style="margin-top: 12px; font-size: 13px; color: var(--text-muted);" id="upload-status">Wird hochgeladen...</p>
+            </div>
+
+            <div class="dashboard" id="dashboard" style="display: none;">
+                <div class="dashboard-header">
+                    <div>
+                        <h2 style="font-size: 26px; margin-bottom: 6px;">Video-Analyse</h2>
+                        <p style="color: var(--text-secondary);" id="analysis-status">Wird analysiert...</p>
+                    </div>
+                    <div class="file-info">
+                        <div class="file-icon">🎬</div>
+                        <div class="file-details">
+                            <div class="name" id="file-name"></div>
+                            <div class="meta" id="file-meta"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="metrics-grid" id="metrics-grid"></div>
+
+                <h3 style="font-size: 20px; margin-bottom: 20px;">Highlights</h3>
+                <div class="highlights-grid" id="highlights-grid"></div>
+
+                <div class="rating-card" id="rating-card">
+                    <h4>Bewerte dieses Highlight</h4>
+                    <div class="rating-buttons">
+                        <button class="rating-btn good" onclick="setRating('good')">👍 Gut</button>
+                        <button class="rating-btn bad" onclick="setRating('bad')">👎 Schlecht</button>
+                    </div>
+                    <textarea class="rating-textarea" id="rating-feedback" placeholder="Feedback (optional)"></textarea>
+                    <button class="submit-btn" id="submit-rating" onclick="submitRating()" disabled>Bewertung absenden</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- History Section -->
+        <section id="history-section" class="section">
+            <h2 style="font-size: 28px; margin-bottom: 24px;">Verlauf</h2>
+            <div class="history-list" id="history-list">
+                <div class="empty-state">
+                    <div class="empty-icon">📊</div>
+                    <p>Noch keine Videos analysiert</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const API = '';
+        let currentVideoId = null;
+        let currentHighlights = [];
+        let currentHighlightIndex = 0;
+        let currentRating = null;
+        let user = null;
+        let pollInterval = null;
+
+        // Tab Navigation
+        function showTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(tab + '-section').classList.add('active');
+            if (tab === 'history') loadHistory();
+        }
+
+        // URL Input
+        function showUrlInput() {
+            document.getElementById('url-section').classList.toggle('active');
+        }
+
+        // File Upload
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            document.getElementById('upload-progress').classList.add('active');
+            document.getElementById('progress-filename').textContent = file.name;
+
+            const xhr = new XMLHttpRequest();
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    document.getElementById('progress-percent').textContent = percent + '%';
+                    document.getElementById('progress-fill').style.width = percent + '%';
+                }
+            });
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status === 200) {
+                    const data = JSON.parse(xhr.responseText);
+                    currentVideoId = data.video_id;
+                    document.getElementById('upload-status').textContent = 'Video wird analysiert...';
+                    startPolling();
+                }
+            });
+
+            xhr.open('POST', API + '/api/upload');
+            xhr.send(formData);
+        }
+
+        // URL Upload
+        async function handleUrlUpload() {
+            const url = document.getElementById('url-input').value;
+            if (!url) return alert('URL eingeben');
+
+            document.getElementById('upload-progress').classList.add('active');
+            document.getElementById('progress-filename').textContent = 'Download von URL...';
+            document.getElementById('upload-status').textContent = 'Wird heruntergeladen...';
+
+            try {
+                const res = await fetch(API + '/api/upload/url', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({url})
+                });
+                const data = await res.json();
+                currentVideoId = data.video_id;
+                startPolling();
+            } catch (e) {
+                alert('Fehler: ' + e.message);
+            }
+        }
+
+        // Poll for analysis
+        function startPolling() {
+            if (pollInterval) clearInterval(pollInterval);
+            pollInterval = setInterval(async () => {
+                try {
+                    const res = await fetch(API + '/api/video/' + currentVideoId);
+                    const data = await res.json();
+                    
+                    document.getElementById('file-name').textContent = data.filename;
+                    document.getElementById('file-meta').textContent = formatSize(data.file_size) + ' • ' + formatTime(data.duration);
+
+                    if (data.status === 'completed') {
+                        clearInterval(pollInterval);
+                        loadResults();
+                    } else if (data.status === 'error') {
+                        clearInterval(pollInterval);
+                        document.getElementById('upload-status').textContent = 'Fehler bei Analyse';
+                    } else {
+                        document.getElementById('upload-status').textContent = 'Analysiere...';
+                    }
+                } catch (e) {}
+            }, 3000);
+        }
+
+        async function loadResults() {
+            const res = await fetch(API + '/api/video/' + currentVideoId + '/highlights');
+            currentHighlights = await res.json();
+
+            document.getElementById('upload-progress').classList.remove('active');
+            document.getElementById('dashboard').style.display = 'block';
+            document.getElementById('analysis-status').textContent = 'Analyse abgeschlossen';
+
+            // Show metrics
+            const metricsContainer = document.getElementById('metrics-grid');
+            const metrics = [
+                {name: 'Pixel-Änderung', key: 'pixel_change_score', icon: '🖼️'},
+                {name: 'Bewegung', key: 'motion_score', icon: '🎯'},
+                {name: 'Gesichter', key: 'face_score', icon: '👤'},
+                {name: 'Helligkeit', key: 'brightness_score', icon: '💡'},
+                {name: 'Kontrast', key: 'contrast_score', icon: '◐'},
+                {name: 'Szenen', key: 'scene_score', icon: '🔄'}
+            ];
+
+            metricsContainer.innerHTML = metrics.map(m => `
+                <div class="metric-card">
+                    <div class="metric-title">${m.icon} ${m.name}</div>
+                    <div class="metric-value" id="metric-${m.key}">0%</div>
+                    <div class="metric-bar"><div class="metric-bar-fill" id="bar-${m.key}" style="width: 0%"></div></div>
+                </div>
+            `).join('');
+
+            // Animate metrics
+            currentHighlights[0]?.metrics && Object.entries(currentHighlights[0].metrics).forEach(([key, val], i) => {
+                setTimeout(() => {
+                    const el = document.getElementById('metric-' + key.replace('_score', '_score'));
+                    const bar = document.getElementById('bar-' + key.replace('_score', '_score'));
+                    if (el && bar) {
+                        let v = 0;
+                        const int = setInterval(() => {
+                            v += 2;
+                            if (v > val) v = val;
+                            el.textContent = v + '%';
+                            bar.style.width = v + '%';
+                            if (v >= val) clearInterval(int);
+                        }, 30);
+                    }
+                }, i * 100);
+            });
+
+            renderHighlights();
+            loadHistory();
+        }
+
+        function renderHighlights() {
+            const container = document.getElementById('highlights-grid');
+            container.innerHTML = currentHighlights.map((h, i) => `
+                <div class="highlight-card" onclick="showRating(${i})">
+                    <div class="highlight-video">
+                        <div class="highlight-play">▶</div>
+                        <div class="highlight-duration">${formatTime(h.end_time - h.start_time)}</div>
+                        <div class="highlight-score">Score: ${Math.round(h.score)}</div>
+                    </div>
+                    <div class="highlight-content">
+                        <div class="highlight-metrics">
+                            <span class="highlight-metric">🖼️ <span>${h.metrics?.pixel || 0}%</span></span>
+                            <span class="highlight-metric">🎯 <span>${h.metrics?.motion || 0}%</span></span>
+                            <span class="highlight-metric">👤 <span>${h.metrics?.face || 0}%</span></span>
+                        </div>
+                        <h4 class="highlight-title">${h.title}</h4>
+                        <p class="highlight-desc">${h.description}</p>
+                        <div class="highlight-actions">
+                            <button class="action-btn" onclick="event.stopPropagation(); downloadHighlight('${h.id}')">⬇️ Download</button>
+                            <button class="action-btn" onclick="event.stopPropagation(); uploadToSocial('${h.id}')">📱 Export</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showRating(index) {
+            currentHighlightIndex = index;
+            document.getElementById('rating-card').classList.add('active');
+            document.getElementById('rating-card').scrollIntoView({behavior: 'smooth'});
+            currentRating = null;
+            document.querySelectorAll('.rating-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('rating-feedback').value = '';
+            document.getElementById('submit-rating').disabled = true;
+        }
+
+        function setRating(rating) {
+            currentRating = rating;
+            document.querySelectorAll('.rating-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector('.rating-btn.' + rating).classList.add('active');
+            document.getElementById('submit-rating').disabled = false;
+        }
+
+        async function submitRating() {
+            if (!currentRating) return;
+            
+            try {
+                await fetch(API + '/api/highlight/' + currentHighlights[currentHighlightIndex].id + '/rate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        rating: currentRating,
+                        feedback: document.getElementById('rating-feedback').value
+                    })
+                });
+
+                document.getElementById('rating-card').classList.remove('active');
+                alert('Danke für Feedback!');
+
+                if (currentHighlightIndex < currentHighlights.length - 1) {
+                    showRating(currentHighlightIndex + 1);
+                }
+            } catch (e) {
+                alert('Fehler: ' + e.message);
+            }
+        }
+
+        function downloadHighlight(id) {
+            window.open(API + '/api/highlight/' + id + '/download', '_blank');
+        }
+
+        function uploadToSocial(id) {
+            alert('Social Upload: YouTube/Instagram/TikTok Integration kommt bald!');
+        }
+
+        async function loadHistory() {
+            try {
+                const res = await fetch(API + '/api/history');
+                const videos = await res.json();
+                const container = document.getElementById('history-list');
+
+                if (videos.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><p>Noch keine Videos analysiert</p></div>';
+                    return;
+                }
+
+                container.innerHTML = videos.map(v => `
+                    <div class="history-item" onclick="loadVideo('${v.id}')">
+                        <div class="history-info">
+                            <div class="history-icon">🎬</div>
+                            <div>
+                                <div class="history-name">${v.filename}</div>
+                                <div class="history-meta">${formatSize(v.file_size)} • ${formatTime(v.duration)}</div>
+                            </div>
+                        </div>
+                        <span class="history-status ${v.status}">${v.status}</span>
+                    </div>
+                `).join('');
+            } catch (e) {}
+        }
+
+        function loadVideo(id) {
+            currentVideoId = id;
+            startPolling();
+            showTab('upload');
+            document.querySelectorAll('.tab')[0].click();
+        }
+
+        function formatSize(bytes) {
+            if (!bytes) return '0 B';
+            const k = 1024;
+            const s = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + s[i];
+        }
+
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return m + ':' + s.toString().padStart(2, '0');
+        }
+
+        // Google Auth
+        function initGoogleAuth() {
+            const clientId = 'YOUR_GOOGLE_CLIENT_ID';
+            if (clientId === 'YOUR_GOOGLE_CLIENT_ID') return;
+
+            google.accounts.id.initialize({
+                client_id: clientId,
+                callback: handleGoogleResponse
+            });
+
+            google.accounts.id.renderButton(document.getElementById('google-btn'), {
+                theme: 'outline',
+                size: 'large',
+                shape: 'circle'
+            });
+        }
+
+        async function handleGoogleResponse(response) {
+            try {
+                const res = await fetch(API + '/api/auth/google', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({token: response.credential})
+                });
+                const data = await res.json();
+                if (data.success) {
+                    user = data.user;
+                    updateUserUI();
+                }
+            } catch (e) {}
+        }
+
+        function updateUserUI() {
+            if (user) {
+                document.getElementById('user-section').innerHTML = `
+                    <span class="user-name">${user.name}</span>
+                    <div class="user-avatar">
+                        <img src="${user.picture || ''}" alt="${user.name}">
+                    </div>
+                `;
+            }
+        }
+
+        // Initialize
+        loadHistory();
+        initGoogleAuth();
+    </script>
+</body>
+</html>
