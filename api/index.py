@@ -105,7 +105,7 @@ HTML = '''<!DOCTYPE html>
             <!-- Login -->
             <div class="login-box" id="login-box">
                 <h2>🔐 Anmelden</h2>
-                <input type="email" id="email-input" class="login-input" placeholder="Deine E-Mail-Adresse" />
+                <input type="email" id="email-input" class="login-input" placeholder="Deine E-Mail-Adresse" autocomplete="email" />
                 <button class="login-btn" id="send-btn" onclick="sendCode()">Code senden</button>
                 
                 <div class="otp-section" id="otp-section" style="margin-top: 24px;">
