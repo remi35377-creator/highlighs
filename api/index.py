@@ -109,11 +109,12 @@ HTML = '''<!DOCTYPE html>
         let highlights = [];
         
         function handleGoogleLogin() {
-            google.accounts.id.initialize({
-                client_id: '927383411890-3qov5lgg999rmd87uf0o2qgi4bvc18f0.apps.googleusercontent.com',
-                callback: handleCredentialResponse
-            });
-            google.accounts.id.prompt();
+            alert('Google OAuth ist momentan deaktiviert. Bitte in Google Console reaktivieren oder Support kontaktieren.');
+            // google.accounts.id.initialize({
+            //     client_id: '927383411890-3qov5lgg999rmd87uf0o2qgi4bvc18f0.apps.googleusercontent.com',
+            //     callback: handleCredentialResponse
+            // });
+            // google.accounts.id.prompt();
         }
         
         async function handleCredentialResponse(response) {
