@@ -14,9 +14,9 @@ HTML = '''<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Highlight AI</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; z-index: 1; }
-        body { font-family: 'Outfit', sans-serif; background: #0a0a0f; color: #fff; min-height: 100vh; position: relative; z-index: 1; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; position: relative; z-index: 10; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Outfit', sans-serif; background: #0a0a0f; color: #fff; min-height: 100vh; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
         header { display: flex; justify-content: space-between; padding: 20px 0; border-bottom: 1px solid rgba(139,92,246,0.15); }
         .logo { display: flex; align-items: center; gap: 12px; }
         .logo-icon { width: 44px; height: 44px; background: linear-gradient(135deg, #8b5cf6, #c084fc); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
@@ -26,9 +26,11 @@ HTML = '''<!DOCTYPE html>
         .hero h1 .highlight { background: linear-gradient(135deg, #8b5cf6, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .hero p { color: #888; font-size: 18px; }
         
-        .login-box { max-width: 400px; margin: 40px auto; padding: 40px; background: #15151f; border-radius: 16px; position: relative; z-index: 100; }
+        .login-box { max-width: 400px; margin: 40px auto; padding: 40px; background: #15151f; border-radius: 16px; }
         .login-input { width: 100%; padding: 16px; margin-bottom: 16px; background: #1a1a25; border: 1px solid rgba(139,92,246,0.3); border-radius: 10px; color: #fff; font-size: 16px; display: block; }
-        .login-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #8b5cf6, #c084fc); border: none; border-radius: 10px; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; display: block; position: relative; z-index: 1000; }
+        .login-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #8b5cf6, #c084fc); border: none; border-radius: 10px; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; display: block; }
+        .login-btn:hover { opacity: 0.9; }
+        .login-btn:active { transform: scale(0.98); }
         
         .otp-section { display: none; }
         .otp-section.active { display: block; }
