@@ -3,3 +3,6 @@ flask-cors==5.0.0
 werkzeug==3.0.0
 python-dotenv==1.0.0
 gunicorn>=21.0.0
+
+# Install at runtime only
+uvicorn>=0.30.0
