@@ -78,7 +78,8 @@ HTML = '''<!DOCTYPE html>
         .history-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
         .history-date { font-size: 12px; color: #888; }
         
-        input { display: none; }
+        input[type="file"] { display: none; }
+        .login-input { display: block; width: 100%; }
         @media (max-width: 768px) { .upload-grid, .metrics-grid, .highlights-grid, .history-grid { grid-template-columns: 1fr; } }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
