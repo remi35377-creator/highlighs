@@ -2,6 +2,8 @@ from flask import Flask, jsonify, request
 import uuid
 import sqlite3
 from datetime import datetime
+import random
+import string
 
 app = Flask(__name__)
 
@@ -24,11 +26,16 @@ HTML = '''<!DOCTYPE html>
         .hero h1 .highlight { background: linear-gradient(135deg, #8b5cf6, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .hero p { color: #888; font-size: 18px; }
         
-        .login-section { max-width: 400px; margin: 40px auto; padding: 40px; background: #15151f; border-radius: 16px; text-align: center; }
-        .login-section h2 { margin-bottom: 24px; }
+        .login-box { max-width: 400px; margin: 40px auto; padding: 40px; background: #15151f; border-radius: 16px; }
+        .login-box h2 { margin-bottom: 24px; text-align: center; }
         .login-input { width: 100%; padding: 16px; margin-bottom: 16px; background: #1a1a25; border: 1px solid rgba(139,92,246,0.3); border-radius: 10px; color: #fff; font-size: 16px; }
         .login-input:focus { outline: none; border-color: #8b5cf6; }
         .login-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #8b5cf6, #c084fc); border: none; border-radius: 10px; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; }
+        .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .otp-section { display: none; }
+        .otp-section.active { display: block; }
+        .otp-input { width: 100%; padding: 16px; margin-bottom: 16px; background: #1a1a25; border: 1px solid rgba(139,92,246,0.3); border-radius: 10px; color: #fff; font-size: 24px; text-align: center; letter-spacing: 8px; font-family: monospace; }
         
         .user-bar { display: flex; align-items: center; gap: 12px; }
         .user-email { font-size: 14px; color: #888; }
@@ -65,13 +72,11 @@ HTML = '''<!DOCTYPE html>
         .action-btn { padding: 10px; border: 1px solid rgba(139,92,246,0.3); border-radius: 8px; background: transparent; color: #888; font-size: 13px; cursor: pointer; width: 100%; }
         
         .history-section { margin-top: 60px; }
-        .history-section h2 { margin-bottom: 20px; }
         .history-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
         .history-card { background: #15151f; border-radius: 14px; padding: 16px; cursor: pointer; }
         .history-card:hover { border: 1px solid rgba(139,92,246,0.5); }
         .history-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
         .history-date { font-size: 12px; color: #888; }
-        .history-status { font-size: 12px; margin-top: 8px; }
         
         input { display: none; }
         @media (max-width: 768px) { .upload-grid, .metrics-grid, .highlights-grid, .history-grid { grid-template-columns: 1fr; } }
@@ -91,15 +96,21 @@ HTML = '''<!DOCTYPE html>
                 <p>KI-gestützte Video-Analyse</p>
             </div>
             
-            <!-- Login Section -->
-            <div class="login-section" id="login-section">
+            <!-- Login -->
+            <div class="login-box" id="login-box">
                 <h2>🔐 Anmelden</h2>
                 <input type="email" id="email-input" class="login-input" placeholder="Deine E-Mail-Adresse" />
-                <input type="password" id="password-input" class="login-input" placeholder="Passwort (beliebig)" />
-                <button class="login-btn" onclick="login()">Anmelden / Registrieren</button>
+                <button class="login-btn" id="send-btn" onclick="sendCode()">Code senden</button>
+                
+                <div class="otp-section" id="otp-section" style="margin-top: 24px;">
+                    <p style="color: #888; margin-bottom: 16px; text-align: center;">Code wurde an deine E-Mail gesendet (Demo: Code wird hier angezeigt)</p>
+                    <div id="code-display" style="color: #8b5cf6; font-size: 24px; text-align: center; margin-bottom: 16px; font-family: monospace;"></div>
+                    <input type="text" id="otp-input" class="otp-input" placeholder="XXXXXX" maxlength="6" />
+                    <button class="login-btn" onclick="verifyCode()">Bestätigen</button>
+                </div>
             </div>
             
-            <!-- Main Content (logged in) -->
+            <!-- Main -->
             <div id="main-content" style="display:none;">
                 <div class="upload-grid">
                     <div class="upload-card" onclick="document.getElementById('file').click()">
@@ -146,28 +157,33 @@ HTML = '''<!DOCTYPE html>
     
     <script>
         let user = null;
-        let token = localStorage.getItem('highlight_token');
+        let currentVideoId = null;
         
-        // Auto-login check
-        if (token) checkLogin();
-        
-        async function checkLogin() {
-            try {
-                const res = await fetch('/api/auth/check', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({token})});
-                const data = await res.json();
-                if (data.success) {
-                    user = data.user;
-                    showLoggedIn();
-                }
-            } catch(e) {}
-        }
-        
-        async function login() {
+        async function sendCode() {
             const email = document.getElementById('email-input').value;
-            const password = document.getElementById('password-input').value;
             if (!email || !email.includes('@')) { alert('Bitte E-Mail eingeben'); return; }
             
-            const res = await fetch('/api/auth/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email, password})});
+            document.getElementById('send-btn').disabled = true;
+            document.getElementById('send-btn').textContent = 'Wird gesendet...';
+            
+            const res = await fetch('/api/auth/send-code', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email})});
+            const data = await res.json();
+            
+            if (data.success) {
+                document.getElementById('code-display').textContent = data.code; // Demo only!
+                document.getElementById('otp-section').classList.add('active');
+                document.getElementById('send-btn').textContent = 'Code gesendet!';
+            } else {
+                alert('Fehler: ' + data.error);
+                document.getElementById('send-btn').disabled = false;
+            }
+        }
+        
+        async function verifyCode() {
+            const email = document.getElementById('email-input').value;
+            const code = document.getElementById('otp-input').value;
+            
+            const res = await fetch('/api/auth/verify', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email, code})});
             const data = await res.json();
             
             if (data.success) {
@@ -175,19 +191,18 @@ HTML = '''<!DOCTYPE html>
                 user = data.user;
                 showLoggedIn();
             } else {
-                alert('Fehler: ' + data.error);
+                alert('Falscher Code!');
             }
         }
         
         function logout() {
             localStorage.removeItem('highlight_token');
             user = null;
-            document.getElementById('login-section').style.display = 'block';
-            document.getElementById('main-content').style.display = 'none';
+            location.reload();
         }
         
         function showLoggedIn() {
-            document.getElementById('login-section').style.display = 'none';
+            document.getElementById('login-box').style.display = 'none';
             document.getElementById('main-content').style.display = 'block';
             document.getElementById('user-bar').innerHTML = '<span class="user-email">' + user.email + '</span><button class="logout-btn" onclick="logout()">Abmelden</button>';
             loadHistory();
@@ -200,7 +215,7 @@ HTML = '''<!DOCTYPE html>
             if (videos.length === 0) {
                 grid.innerHTML = '<p style="color:#888; grid-column:1/-1;">Noch keine Videos</p>';
             } else {
-                grid.innerHTML = videos.map(v => '<div class="history-card" onclick="loadVideo(\'' + v.id + '\')"><div class="history-title">' + v.filename + '</div><div class="history-date">' + v.date + '</div><div class="history-status">' + v.status + '</div></div>').join('');
+                grid.innerHTML = videos.map(v => '<div class="history-card" onclick="loadVideo(\'' + v.id + '\')"><div class="history-title">' + v.filename + '</div><div class="history-date">' + v.date + '</div></div>').join('');
             }
         }
         
@@ -210,8 +225,6 @@ HTML = '''<!DOCTYPE html>
             document.getElementById('dashboard').scrollIntoView({behavior:'smooth'});
             loadHighlights(vid);
         }
-        
-        let currentVideoId = null;
         
         function handleFile(event) {
             const file = event.target.files[0];
@@ -241,7 +254,6 @@ HTML = '''<!DOCTYPE html>
                 document.getElementById('progress-percent').textContent = '100%';
                 currentVideoId = data.video_id;
                 
-                // Poll for processing
                 let pollCount = 0;
                 const pollInt = setInterval(async () => {
                     pollCount++;
@@ -279,9 +291,7 @@ HTML = '''<!DOCTYPE html>
             grid.innerHTML = '';
             highlights.forEach(h => {
                 const dur = h.end_time - h.start_time;
-                const mins = Math.floor(dur / 60);
-                const secs = Math.floor(dur % 60);
-                grid.innerHTML += '<div class="highlight-card"><div class="highlight-video"><div class="highlight-play">▶</div><div class="highlight-duration">' + mins + ':' + String(secs).padStart(2,'0') + '</div><div class="highlight-score">Score: ' + h.score + '</div></div><div class="highlight-content"><div class="highlight-metrics"><span class="highlight-metric">🖼️ ' + (h.metrics?.pixel||75) + '%</span><span class="highlight-metric">🎯 ' + (h.metrics?.motion||80) + '%</span></div><div class="highlight-title">' + h.title + '</div><button class="action-btn">⬇️ Download</button></div></div>';
+                grid.innerHTML += '<div class="highlight-card"><div class="highlight-video"><div class="highlight-play">▶</div><div class="highlight-duration">' + Math.floor(dur/60) + ':' + String(Math.floor(dur%60)).padStart(2,'0') + '</div><div class="highlight-score">Score: ' + h.score + '</div></div><div class="highlight-content"><div class="highlight-metrics"><span class="highlight-metric">🖼️ ' + (h.metrics?.pixel||75) + '%</span><span class="highlight-metric">🎯 ' + (h.metrics?.motion||80) + '%</span></div><div class="highlight-title">' + h.title + '</div><button class="action-btn">⬇️ Download</button></div></div>';
             });
         }
         
@@ -293,34 +303,84 @@ HTML = '''<!DOCTYPE html>
                 .then(data => { currentVideoId = data.video_id; loadHighlights(data.video_id); });
             }
         }
+        
+        // Check existing session
+        const token = localStorage.getItem('highlight_token');
+        if (token) {
+            fetch('/api/auth/check', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({token})})
+            .then(r => r.json())
+            .then(data => { if (data.success) { user = data.user; showLoggedIn(); } });
+        }
     </script>
 </body>
 </html>
 '''
 
+def generate_code():
+    return ''.join(random.choices(string.digits, k=6))
+
 @app.route('/')
 def home():
     return HTML
 
-@app.route('/api/auth/login', methods=['POST'])
-def login():
+@app.route('/api/auth/send-code', methods=['POST'])
+def send_code():
     data = request.get_json()
     email = data.get('email', '').lower().strip()
-    password = data.get('password', '')
     
     if not email or '@' not in email:
         return jsonify({'error': 'Ungültige E-Mail'}), 400
     
-    token = str(uuid.uuid4())
+    code = generate_code()
     
     import sqlite3
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
-    c.execute('CREATE TABLE IF NOT EXISTS users (email TEXT PRIMARY KEY, token TEXT, created_at TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS videos (id TEXT PRIMARY KEY, email TEXT, filename TEXT, date TEXT, status TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS highlights (id TEXT, video_id TEXT, email TEXT, start_time REAL, end_time REAL, score REAL, title TEXT, metrics TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS users (email TEXT, code TEXT, code_expires TEXT)')
     
-    c.execute('INSERT OR REPLACE INTO users VALUES (?, ?, ?)', (email, token, datetime.now().isoformat()))
+    # Store code (expires in 5 minutes)
+    from datetime import datetime, timedelta
+    expires = (datetime.now() + timedelta(minutes=5)).isoformat()
+    c.execute('INSERT OR REPLACE INTO users (email, code, code_expires) VALUES (?, ?, ?)', (email, code, expires))
+    conn.commit()
+    conn.close()
+    
+    # In real app, send email! For demo, return code
+    return jsonify({'success': True, 'code': code})
+
+@app.route('/api/auth/verify', methods=['POST'])
+def verify_code():
+    data = request.get_json()
+    email = data.get('email', '').lower().strip()
+    code = data.get('code', '')
+    
+    import sqlite3
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    c.execute('SELECT code, code_expires FROM users WHERE email = ?', (email,))
+    row = c.fetchone()
+    conn.close()
+    
+    if not row:
+        return jsonify({'error': 'User nicht gefunden'}), 400
+    
+    stored_code, expires = row
+    
+    from datetime import datetime
+    if datetime.now() > datetime.fromisoformat(expires):
+        return jsonify({'error': 'Code abgelaufen'}), 400
+    
+    if code != stored_code:
+        return jsonify({'error': 'Falscher Code'}), 400
+    
+    # Generate session token
+    import uuid
+    token = str(uuid.uuid4())
+    
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    c.execute('CREATE TABLE IF NOT EXISTS sessions (email TEXT, token TEXT)')
+    c.execute('INSERT OR REPLACE INTO sessions VALUES (?, ?)', (email, token))
     conn.commit()
     conn.close()
     
@@ -334,7 +394,7 @@ def check_auth():
     import sqlite3
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
-    c.execute('SELECT email FROM users WHERE token = ?', (token,))
+    c.execute('SELECT email FROM sessions WHERE token = ?', (token,))
     row = c.fetchone()
     conn.close()
     
@@ -347,10 +407,6 @@ def upload():
     if 'file' not in request.files:
         return jsonify({'error': 'No file'}), 400
     
-    file = request.files['file']
-    if not file.filename:
-        return jsonify({'error': 'No file'}), 400
-    
     email = request.form.get('email', '')
     token = request.form.get('token', '')
     
@@ -358,11 +414,12 @@ def upload():
         return jsonify({'error': 'Not logged in'}), 401
     
     video_id = str(uuid.uuid4())
-    filename = file.filename[:100]
+    filename = request.files['file'].filename[:100]
     
     import sqlite3
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
+    c.execute('CREATE TABLE IF NOT EXISTS videos (id, email, filename, date, status)')
     c.execute('INSERT INTO videos VALUES (?, ?, ?, ?, ?)', (video_id, email, filename, datetime.now().isoformat(), 'processing'))
     conn.commit()
     conn.close()
@@ -417,4 +474,4 @@ def history(email):
     c.execute('SELECT id, filename, date, status FROM videos WHERE email = ? ORDER BY date DESC', (email,))
     videos = c.fetchall()
     conn.close()
-    return jsonify([{'id': v[0], 'filename': v[1], 'date': v[2], 'status': v[3]} for v in videos])
+    return jsonify([{'id': v[0], 'filename': v[1], 'date': v[2][:10], 'status': v[3]} for v in videos])
