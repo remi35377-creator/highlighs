@@ -1,11 +1,16 @@
 from flask import Flask, jsonify, request
 import uuid
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
 import string
 
 app = Flask(__name__)
+
+# In-memory storage for Vercel (serverless)
+users_db = {}
+sessions_db = {}
+videos_db = {}
 
 HTML = '''<!DOCTYPE html>
 <html lang="de">
@@ -332,20 +337,9 @@ def send_code():
         return jsonify({'error': 'Ungültige E-Mail'}), 400
     
     code = generate_code()
-    
-    import sqlite3
-    conn = sqlite3.connect('database.db')
-    c = conn.cursor()
-    c.execute('CREATE TABLE IF NOT EXISTS users (email TEXT, code TEXT, code_expires TEXT)')
-    
-    # Store code (expires in 5 minutes)
-    from datetime import datetime, timedelta
     expires = (datetime.now() + timedelta(minutes=5)).isoformat()
-    c.execute('INSERT OR REPLACE INTO users (email, code, code_expires) VALUES (?, ?, ?)', (email, code, expires))
-    conn.commit()
-    conn.close()
+    users_db[email] = {'code': code, 'expires': expires}
     
-    # In real app, send email! For demo, return code
     return jsonify({'success': True, 'code': code})
 
 @app.route('/api/auth/verify', methods=['POST'])
@@ -354,35 +348,21 @@ def verify_code():
     email = data.get('email', '').lower().strip()
     code = data.get('code', '')
     
-    import sqlite3
-    conn = sqlite3.connect('database.db')
-    c = conn.cursor()
-    c.execute('SELECT code, code_expires FROM users WHERE email = ?', (email,))
-    row = c.fetchone()
-    conn.close()
-    
-    if not row:
+    if email not in users_db:
         return jsonify({'error': 'User nicht gefunden'}), 400
     
-    stored_code, expires = row
+    user = users_db[email]
+    stored_code = user['code']
+    expires = datetime.fromisoformat(user['expires'])
     
-    from datetime import datetime
-    if datetime.now() > datetime.fromisoformat(expires):
+    if datetime.now() > expires:
         return jsonify({'error': 'Code abgelaufen'}), 400
     
     if code != stored_code:
         return jsonify({'error': 'Falscher Code'}), 400
     
-    # Generate session token
-    import uuid
     token = str(uuid.uuid4())
-    
-    conn = sqlite3.connect('database.db')
-    c = conn.cursor()
-    c.execute('CREATE TABLE IF NOT EXISTS sessions (email TEXT, token TEXT)')
-    c.execute('INSERT OR REPLACE INTO sessions VALUES (?, ?)', (email, token))
-    conn.commit()
-    conn.close()
+    sessions_db[token] = {'email': email, 'expires': (datetime.now() + timedelta(days=7)).isoformat()}
     
     return jsonify({'success': True, 'token': token, 'user': {'email': email}})
 
@@ -391,15 +371,10 @@ def check_auth():
     data = request.get_json()
     token = data.get('token', '')
     
-    import sqlite3
-    conn = sqlite3.connect('database.db')
-    c = conn.cursor()
-    c.execute('SELECT email FROM sessions WHERE token = ?', (token,))
-    row = c.fetchone()
-    conn.close()
-    
-    if row:
-        return jsonify({'success': True, 'user': {'email': row[0]}})
+    if token in sessions_db:
+        session = sessions_db[token]
+        if datetime.now() < datetime.fromisoformat(session['expires']):
+            return jsonify({'success': True, 'user': {'email': session['email']}})
     return jsonify({'error': 'Invalid'}), 401
 
 @app.route('/api/upload', methods=['POST'])
@@ -416,13 +391,7 @@ def upload():
     video_id = str(uuid.uuid4())
     filename = request.files['file'].filename[:100]
     
-    import sqlite3
-    conn = sqlite3.connect('database.db')
-    c = conn.cursor()
-    c.execute('CREATE TABLE IF NOT EXISTS videos (id, email, filename, date, status)')
-    c.execute('INSERT INTO videos VALUES (?, ?, ?, ?, ?)', (video_id, email, filename, datetime.now().isoformat(), 'processing'))
-    conn.commit()
-    conn.close()
+    videos_db[video_id] = {'email': email, 'filename': filename, 'date': datetime.now().isoformat(), 'status': 'processing'}
     
     return jsonify({'video_id': video_id, 'status': 'processing'})
 
@@ -437,26 +406,16 @@ def upload_url():
         return jsonify({'error': 'Not logged in'}), 401
     
     video_id = str(uuid.uuid4())
-    import sqlite3
-    conn = sqlite3.connect('database.db')
-    c = conn.cursor()
-    c.execute('INSERT INTO videos VALUES (?, ?, ?, ?, ?)', (video_id, email, url.split('/')[-1][:100], datetime.now().isoformat(), 'processing'))
-    conn.commit()
-    conn.close()
+    videos_db[video_id] = {'email': email, 'filename': url.split('/')[-1][:100], 'date': datetime.now().isoformat(), 'status': 'processing'}
     
     return jsonify({'video_id': video_id, 'status': 'processing'})
 
 @app.route('/api/video/<vid>')
 def get_video(vid):
-    import sqlite3
-    conn = sqlite3.connect('database.db')
-    c = conn.cursor()
-    c.execute('SELECT * FROM videos WHERE id = ?', (vid,))
-    v = c.fetchone()
-    conn.close()
-    if not v:
+    if vid not in videos_db:
         return jsonify({'error': 'Not found'}), 404
-    return jsonify({'id': v[0], 'filename': v[2], 'status': v[4]})
+    v = videos_db[vid]
+    return jsonify({'id': vid, 'filename': v['filename'], 'status': v['status']})
 
 @app.route('/api/video/<vid>/highlights')
 def highlights(vid):
@@ -468,10 +427,7 @@ def highlights(vid):
 
 @app.route('/api/history/<email>')
 def history(email):
-    import sqlite3
-    conn = sqlite3.connect('database.db')
-    c = conn.cursor()
-    c.execute('SELECT id, filename, date, status FROM videos WHERE email = ? ORDER BY date DESC', (email,))
-    videos = c.fetchall()
-    conn.close()
-    return jsonify([{'id': v[0], 'filename': v[1], 'date': v[2][:10], 'status': v[3]} for v in videos])
+    email = email.lower()
+    videos = [{'id': vid, 'filename': v['filename'], 'date': v['date'][:10], 'status': v['status']} 
+             for vid, v in videos_db.items() if v.get('email') == email]
+    return jsonify(videos)

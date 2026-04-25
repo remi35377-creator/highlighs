@@ -1,9 +1,13 @@
 {
   "rewrites": [
-    { "source": "/api/auth/(.*)", "destination": "/api/index.py" },
-    { "source": "/api/history/(.*)", "destination": "/api/index.py" },
+    { "source": "/api/auth/send-code", "destination": "/api/index.py" },
+    { "source": "/api/auth/verify", "destination": "/api/index.py" },
+    { "source": "/api/auth/check", "destination": "/api/index.py" },
+    { "source": "/api/history/:email", "destination": "/api/index.py" },
     { "source": "/api/upload", "destination": "/api/index.py" },
-    { "source": "/api/highlights/(.*)", "destination": "/api/index.py" },
+    { "source": "/api/upload/url", "destination": "/api/index.py" },
+    { "source": "/api/video/:vid", "destination": "/api/index.py" },
+    { "source": "/api/video/:vid/highlights", "destination": "/api/index.py" },
     { "source": "/(.*)", "destination": "/api/index" }
   ]
 }
