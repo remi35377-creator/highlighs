@@ -10,9 +10,15 @@ from datetime import datetime
 from flask import Flask, request, jsonify, send_file, render_template, send_from_directory
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
@@ -478,9 +484,9 @@ def google_auth():
         from google.oauth2 import id_token
         from google.auth.transport import requests as google_requests
         
-        CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
-        if CLIENT_ID:
-            id_info = id_token.verify_token(token, google_requests.Request(), CLIENT_ID)
+        CLIENT_ID = GOOGLE_CLIENT_ID
+        if CLIENT_ID and GOOGLE_CLIENT_ID:
+            id_info = id_token.verify_token(token, google_requests.Request(), GOOGLE_CLIENT_ID)
         else:
             id_info = {'sub': str(uuid.uuid4()), 'email': 'demo@example.com', 'name': 'Demo User'}
         
