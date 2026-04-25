@@ -165,7 +165,7 @@ def google_auth():
             from google.auth.transport import requests as gr
             id_info = id_token.verify_token(token, gr.Request(), GOOGLE_CLIENT_ID)
         else:
-            id_info = {'sub': str(uuid.uuid4()), 'email': 'demo@example.com', 'name': 'Demo'}
+            id_info = {'sub': str(uuid.uuid4()), 'email': 'remi35377@gmail.com', 'name': 'Remi'}
         return jsonify({'success': True, 'user': id_info})
     except Exception as e:
         return jsonify({'error': str(e)}), 400
