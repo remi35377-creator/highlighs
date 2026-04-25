@@ -4,8 +4,12 @@ import sqlite3
 from datetime import datetime, timedelta
 import random
 import string
+import os
+import requests
 
 app = Flask(__name__)
+
+RESEND_KEY = os.environ.get('RESEND_API_KEY', 're_6rbaVj9Q_HsW3ohbAPUGtBjv5wL9LtT1w')
 
 # In-memory storage for Vercel (serverless)
 users_db = {}
@@ -108,8 +112,7 @@ HTML = '''<!DOCTYPE html>
                 <button class="login-btn" id="send-btn" onclick="sendCode()">Code senden</button>
                 
                 <div class="otp-section" id="otp-section" style="margin-top: 24px;">
-                    <p style="color: #888; margin-bottom: 16px; text-align: center;">Code wurde an deine E-Mail gesendet (Demo: Code wird hier angezeigt)</p>
-                    <div id="code-display" style="color: #8b5cf6; font-size: 24px; text-align: center; margin-bottom: 16px; font-family: monospace;"></div>
+                    <p style="color: #888; margin-bottom: 16px; text-align: center;">Gib den Code ein, den du per E-Mail erhalten hast</p>
                     <input type="text" id="otp-input" class="otp-input" placeholder="XXXXXX" maxlength="6" />
                     <button class="login-btn" onclick="verifyCode()">Bestätigen</button>
                 </div>
@@ -175,7 +178,6 @@ HTML = '''<!DOCTYPE html>
             const data = await res.json();
             
             if (data.success) {
-                document.getElementById('code-display').textContent = data.code; // Demo only!
                 document.getElementById('otp-section').classList.add('active');
                 document.getElementById('send-btn').textContent = 'Code gesendet!';
             } else {
@@ -324,6 +326,25 @@ HTML = '''<!DOCTYPE html>
 def generate_code():
     return ''.join(random.choices(string.digits, k=6))
 
+def send_verification_email(email, code):
+    try:
+        r = requests.post('https://api.resend.com/emails', {
+            'from': 'Highlight AI <onboarding@resend.dev>',
+            'to': email,
+            'subject': '🔐 Dein Bestätigungscode für Highlight AI',
+            'html': f'''
+            <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
+                <h1 style="color: #8b5cf6;">⚡ Highlight AI</h1>
+                <p>Dein Bestätigungscode:</p>
+                <div style="background: #15151f; padding: 20px; border-radius: 10px; text-align: center; font-size: 32px; letter-spacing: 8px; color: #8b5cf6; font-weight: bold;">{code}</div>
+                <p style="color: #666; margin-top: 20px;">Dieser Code ist 5 Minuten gültig.</p>
+            </div>
+            '''
+        }, headers={'Authorization': f'Bearer {RESEND_KEY}'}, timeout=10)
+        return r.status_code == 200
+    except:
+        return False
+
 @app.route('/')
 def home():
     return HTML
@@ -340,7 +361,9 @@ def send_code():
     expires = (datetime.now() + timedelta(minutes=5)).isoformat()
     users_db[email] = {'code': code, 'expires': expires}
     
-    return jsonify({'success': True, 'code': code})
+    send_verification_email(email, code)
+    
+    return jsonify({'success': True, 'message': 'Code wurde per E-Mail gesendet'})
 
 @app.route('/api/auth/verify', methods=['POST'])
 def verify_code():
