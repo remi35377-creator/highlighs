@@ -5,7 +5,6 @@ import random
 import string
 import os
 import requests
-
 import hmac
 import hashlib
 import json
@@ -15,7 +14,6 @@ app = Flask(__name__)
 RESEND_KEY = os.environ.get('RESEND_API_KEY', 're_6rbaVj9Q_HsW3ohbAPUGtBjv5wL9LtT1w')
 SECRET_KEY = os.environ.get('SECRET_KEY', 'highlight-ai-secret-2026')
 
-users_db = {}
 sessions_db = {}
 videos_db = {}
 
@@ -67,7 +65,7 @@ HTML = '''<!DOCTYPE html>
     <title>Highlight AI</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0f; color: #fff; min-height: 100vh; }
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #0a0a0f; color: #fff; min-height: 100vh; }
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
         header { display: flex; justify-content: space-between; padding: 20px 0; border-bottom: 1px solid rgba(139,92,246,0.15); }
         .logo { display: flex; align-items: center; gap: 12px; }
@@ -192,35 +190,6 @@ HTML = '''<!DOCTYPE html>
         
         document.getElementById('send-btn').addEventListener('click', sendCode);
         document.getElementById('verify-btn').addEventListener('click', verifyCode);
-        
-        function sendCode() {
-            var email = document.getElementById('email-input').value;
-            if (!email || email.indexOf('@') === -1) { alert('Bitte E-Mail eingeben'); return; }
-            
-            document.getElementById('send-btn').disabled = true;
-            document.getElementById('send-btn').textContent = 'Wird gesendet...';
-            
-            var xhr = new XMLHttpRequest();
-            xhr.open('POST', '/api/auth/send-code', true);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                        var data = JSON.parse(xhr.responseText);
-                        if (data.success) {
-                            verifyToken = data.verify_token;
-                            document.getElementById('otp-section').style.display = 'block';
-                            document.getElementById('send-btn').textContent = 'Code gesendet!';
-                        } else {
-                            alert('Fehler: ' + data.error);
-                            document.getElementById('send-btn').disabled = false;
-                            document.getElementById('send-btn').textContent = 'Code senden';
-                        }
-                    } else {
-                        alert('Fehler beim Senden');
-                        document.getElementById('send-btn').disabled = false;
-                        document.getElementById('send-btn').textContent = 'Code senden';
-                    }
         document.getElementById('upload-file').addEventListener('click', function() { document.getElementById('file').click(); });
         document.getElementById('file').addEventListener('change', handleFile);
         document.getElementById('upload-url').addEventListener('click', showUrlInput);
@@ -229,29 +198,29 @@ HTML = '''<!DOCTYPE html>
             var email = document.getElementById('email-input').value;
             if (!email || email.indexOf('@') === -1) { alert('Bitte E-Mail eingeben'); return; }
             
-            document.getElementById('send-btn').disabled = true;
-            document.getElementById('send-btn').textContent = 'Wird gesendet...';
+            var btn = document.getElementById('send-btn');
+            btn.disabled = true;
+            btn.textContent = 'Wird gesendet...';
             
             var xhr = new XMLHttpRequest();
             xhr.open('POST', '/api/auth/send-code', true);
             xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                        var data = JSON.parse(xhr.responseText);
-                        if (data.success) {
-                            document.getElementById('otp-section').style.display = 'block';
-                            document.getElementById('send-btn').textContent = 'Code gesendet!';
-                        } else {
-                            alert('Fehler: ' + data.error);
-                            document.getElementById('send-btn').disabled = false;
-                            document.getElementById('send-btn').textContent = 'Code senden';
-                        }
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    var data = JSON.parse(xhr.responseText);
+                    if (data.success) {
+                        verifyToken = data.verify_token;
+                        document.getElementById('otp-section').style.display = 'block';
+                        btn.textContent = 'Code gesendet!';
                     } else {
-                        alert('Fehler beim Senden');
-                        document.getElementById('send-btn').disabled = false;
-                        document.getElementById('send-btn').textContent = 'Code senden';
+                        alert('Fehler: ' + data.error);
+                        btn.disabled = false;
+                        btn.textContent = 'Code senden';
                     }
+                } else {
+                    alert('Fehler beim Senden');
+                    btn.disabled = false;
+                    btn.textContent = 'Code senden';
                 }
             };
             xhr.send(JSON.stringify({email: email}));
@@ -264,20 +233,18 @@ HTML = '''<!DOCTYPE html>
             var xhr = new XMLHttpRequest();
             xhr.open('POST', '/api/auth/verify', true);
             xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                        var data = JSON.parse(xhr.responseText);
-                        if (data.success) {
-                            localStorage.setItem('highlight_token', data.token);
-                            user = data.user;
-                            showLoggedIn();
-                        } else {
-                            alert('Falscher Code oder abgelaufen!');
-                        }
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    var data = JSON.parse(xhr.responseText);
+                    if (data.success) {
+                        localStorage.setItem('highlight_token', data.token);
+                        user = data.user;
+                        showLoggedIn();
                     } else {
-                        alert('Fehler bei der Verifizierung');
+                        alert('Falscher Code oder abgelaufen!');
                     }
+                } else {
+                    alert('Fehler bei der Verifizierung');
                 }
             };
             xhr.send(JSON.stringify({email: email, code: code, verify_token: verifyToken}));
@@ -299,8 +266,8 @@ HTML = '''<!DOCTYPE html>
         function loadHistory() {
             var xhr = new XMLHttpRequest();
             xhr.open('GET', '/api/history/' + user.email, true);
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4 && xhr.status === 200) {
+            xhr.onload = function() {
+                if (xhr.status === 200) {
                     var videos = JSON.parse(xhr.responseText);
                     var grid = document.getElementById('history-grid');
                     if (videos.length === 0) {
@@ -308,7 +275,7 @@ HTML = '''<!DOCTYPE html>
                     } else {
                         var html = '';
                         for (var i = 0; i < videos.length; i++) {
-                            html += '<div class="history-card" onclick="loadVideo(\\'' + videos[i].id + '\\')"><div class="history-title">' + videos[i].filename + '</div><div class="history-date">' + videos[i].date + '</div></div>';
+                            html += '<div class="history-card" onclick="loadVideo(\'' + videos[i].id + '\')"><div class="history-title">' + videos[i].filename + '</div><div class="history-date">' + videos[i].date + '</div></div>';
                         }
                         grid.innerHTML = html;
                     }
@@ -336,15 +303,15 @@ HTML = '''<!DOCTYPE html>
             formData.append('token', localStorage.getItem('highlight_token'));
             
             var xhr = new XMLHttpRequest();
-            xhr.upload.onprogress = function(e) {
-                if (e.lengthComputable) {
-                    var percent = Math.round((e.loaded / e.total) * 100);
+            xhr.upload.onprogress = function(evt) {
+                if (evt.lengthComputable) {
+                    var percent = Math.round((evt.loaded / evt.total) * 100);
                     document.getElementById('progress-percent').textContent = percent + '%';
                     document.getElementById('progress-fill').style.width = percent + '%';
                 }
             };
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4 && xhr.status === 200) {
+            xhr.onload = function() {
+                if (xhr.status === 200) {
                     var data = JSON.parse(xhr.responseText);
                     currentVideoId = data.video_id;
                     loadHighlights(currentVideoId);
@@ -358,8 +325,8 @@ HTML = '''<!DOCTYPE html>
         function loadHighlights(vid) {
             var xhr = new XMLHttpRequest();
             xhr.open('GET', '/api/video/' + vid + '/highlights', true);
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4 && xhr.status === 200) {
+            xhr.onload = function() {
+                if (xhr.status === 200) {
                     var highlights = JSON.parse(xhr.responseText);
                     document.getElementById('dashboard').classList.add('active');
                     
@@ -398,8 +365,8 @@ HTML = '''<!DOCTYPE html>
                 var xhr = new XMLHttpRequest();
                 xhr.open('POST', '/api/upload/url', true);
                 xhr.setRequestHeader('Content-Type', 'application/json');
-                xhr.onreadystatechange = function() {
-                    if (xhr.readyState === 4 && xhr.status === 200) {
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
                         var data = JSON.parse(xhr.responseText);
                         currentVideoId = data.video_id;
                         loadHighlights(data.video_id);
@@ -414,8 +381,8 @@ HTML = '''<!DOCTYPE html>
             var xhr = new XMLHttpRequest();
             xhr.open('POST', '/api/auth/check', true);
             xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4 && xhr.status === 200) {
+            xhr.onload = function() {
+                if (xhr.status === 200) {
                     var data = JSON.parse(xhr.responseText);
                     if (data.success) { user = data.user; showLoggedIn(); }
                 }
@@ -452,7 +419,6 @@ def verify_code():
     code = data.get('code', '')
     verify_token = data.get('verify_token', '')
     
-    # Verify using token
     info = verify_token(verify_token)
     if not info:
         return jsonify({'error': 'Ungültiger Token'}), 400
