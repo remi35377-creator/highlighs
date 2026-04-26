@@ -38,6 +38,7 @@ HTML = '''<!DOCTYPE html>
         .login-box { max-width: 400px; margin: 40px auto; padding: 40px; background: #15151f; border-radius: 16px; position: relative; }
         .login-input { width: 100%; padding: 16px; margin-bottom: 16px; background: #1a1a25; border: 1px solid rgba(139,92,246,0.3); border-radius: 10px; color: #fff; font-size: 16px; display: block; }
         .login-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #8b5cf6, #c084fc); border: none; border-radius: 10px; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; display: block; }
+        .login-btn:focus { outline: 2px solid #fff; }
         .otp-section { display: none; }
         .otp-section.active { display: block; }
         .otp-input { width: 100%; padding: 16px; margin-bottom: 16px; background: #1a1a25; border: 1px solid rgba(139,92,246,0.3); border-radius: 10px; color: #fff; font-size: 24px; text-align: center; letter-spacing: 8px; font-family: monospace; }
@@ -106,7 +107,7 @@ HTML = '''<!DOCTYPE html>
             <div class="login-box" id="login-box">
                 <h2>🔐 Anmelden</h2>
                 <input type="email" id="email-input" class="login-input" placeholder="Deine E-Mail-Adresse" autocomplete="email" />
-                <button class="login-btn" id="send-btn" onclick="sendCode()">Code senden</button>
+                <button type="button" class="login-btn" id="send-btn" onclick="sendCode()">Code senden</button>
                 
                 <div class="otp-section" id="otp-section" style="margin-top: 24px;">
                     <p style="color: #888; margin-bottom: 16px; text-align: center;">Gib den Code ein, den du per E-Mail erhalten hast</p>
