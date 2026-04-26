@@ -21,7 +21,7 @@ HTML = '''<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Highlight AI</title>
+    <title>Highlight AI - Video Highlights</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Outfit', sans-serif; background: #0a0a0f; color: #fff; min-height: 100vh; }
