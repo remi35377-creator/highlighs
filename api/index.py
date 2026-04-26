@@ -107,12 +107,12 @@ HTML = '''<!DOCTYPE html>
             <div class="login-box" id="login-box">
                 <h2>🔐 Anmelden</h2>
                 <input type="email" id="email-input" class="login-input" placeholder="Deine E-Mail-Adresse" autocomplete="email" />
-                <button type="button" class="login-btn" id="send-btn" onclick="sendCode()">Code senden</button>
+                <button type="button" id="send-btn" style="width:100%;padding:16px;background:linear-gradient(135deg,#8b5cf6,#c084fc);border:none;border-radius:10px;color:#fff;font-size:16px;font-weight:600;cursor:pointer;" onclick="sendCode()">Code senden</button>
                 
-                <div class="otp-section" id="otp-section" style="margin-top: 24px;">
-                    <p style="color: #888; margin-bottom: 16px; text-align: center;">Gib den Code ein, den du per E-Mail erhalten hast</p>
-                    <input type="text" id="otp-input" class="otp-input" placeholder="XXXXXX" maxlength="6" />
-                    <button class="login-btn" onclick="verifyCode()">Bestätigen</button>
+                <div id="otp-section" style="display:none;margin-top:24px;">
+                    <p style="color:#888;margin-bottom:16px;text-align:center;">Gib den Code ein, den du per E-Mail erhalten hast</p>
+                    <input type="text" id="otp-input" style="width:100%;padding:16px;margin-bottom:16px;background:#1a1a25;border:1px solid rgba(139,92,246,0.3);border-radius:10px;color:#fff;font-size:24px;text-align:center;letter-spacing:8px;font-family:monospace;" placeholder="XXXXXX" maxlength="6" />
+                    <button type="button" style="width:100%;padding:16px;background:linear-gradient(135deg,#8b5cf6,#c084fc);border:none;border-radius:10px;color:#fff;font-size:16px;font-weight:600;cursor:pointer;" onclick="verifyCode()">Bestätigen</button>
                 </div>
             </div>
             
