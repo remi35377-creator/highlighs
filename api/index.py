@@ -274,9 +274,13 @@ HTML = '''<!DOCTYPE html>
                     } else {
                         var html = '';
                         for (var i = 0; i < videos.length; i++) {
-                            html += '<div class="history-card" onclick="loadVideo(\'' + videos[i].id + '\')"><div class="history-title">' + videos[i].filename + '</div><div class="history-date">' + videos[i].date + '</div></div>';
+                            var card = document.createElement('div');
+                            card.className = 'history-card';
+                            card.dataset.id = videos[i].id;
+                            card.onclick = function() { loadVideo(this.dataset.id); };
+                            card.innerHTML = '<div class="history-title">' + videos[i].filename + '</div><div class="history-date">' + videos[i].date + '</div>';
+                            grid.appendChild(card);
                         }
-                        grid.innerHTML = html;
                     }
                 }
             };
