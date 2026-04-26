@@ -165,21 +165,30 @@ HTML = '''<!DOCTYPE html>
         let currentVideoId = null;
         
         async function sendCode() {
+            console.log('sendCode called');
             const email = document.getElementById('email-input').value;
+            console.log('Email:', email);
             if (!email || !email.includes('@')) { alert('Bitte E-Mail eingeben'); return; }
             
             document.getElementById('send-btn').disabled = true;
             document.getElementById('send-btn').textContent = 'Wird gesendet...';
             
-            const res = await fetch('/api/auth/send-code', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email})});
-            const data = await res.json();
-            
-            if (data.success) {
-                document.getElementById('otp-section').classList.add('active');
-                document.getElementById('send-btn').textContent = 'Code gesendet!';
-            } else {
-                alert('Fehler: ' + data.error);
-                document.getElementById('send-btn').disabled = false;
+            try {
+                const res = await fetch('/api/auth/send-code', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email})});
+                console.log('Response status:', res.status);
+                const data = await res.json();
+                console.log('Response data:', data);
+                
+                if (data.success) {
+                    document.getElementById('otp-section').style.display = 'block';
+                    document.getElementById('send-btn').textContent = 'Code gesendet!';
+                } else {
+                    alert('Fehler: ' + data.error);
+                    document.getElementById('send-btn').disabled = false;
+                }
+            } catch(e) {
+                console.error('Error:', e);
+                alert('Fehler: ' + e.message);
             }
         }
         
