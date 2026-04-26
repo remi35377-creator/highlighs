@@ -6,9 +6,14 @@ import string
 import os
 import requests
 
+import hmac
+import hashlib
+import json
+
 app = Flask(__name__)
 
 RESEND_KEY = os.environ.get('RESEND_API_KEY', 're_6rbaVj9Q_HsW3ohbAPUGtBjv5wL9LtT1w')
+SECRET_KEY = os.environ.get('SECRET_KEY', 'highlight-ai-secret-2026')
 
 users_db = {}
 sessions_db = {}
@@ -16,6 +21,24 @@ videos_db = {}
 
 def generate_code():
     return ''.join(random.choices(string.digits, k=6))
+
+def create_verify_token(email, code):
+    data = json.dumps({'email': email, 'code': code, 'exp': datetime.now().timestamp() + 300})
+    signature = hmac.new(SECRET_KEY.encode(), data.encode(), hashlib.sha256).hexdigest()
+    return data + '.' + signature
+
+def verify_token(token):
+    try:
+        data, signature = token.rsplit('.', 1)
+        expected = hmac.new(SECRET_KEY.encode(), data.encode(), hashlib.sha256).hexdigest()
+        if signature != expected:
+            return None
+        info = json.loads(data)
+        if datetime.now().timestamp() > info['exp']:
+            return None
+        return info
+    except:
+        return None
 
 def send_verification_email(email, code):
     try:
@@ -165,9 +188,39 @@ HTML = '''<!DOCTYPE html>
     <script>
         var user = null;
         var currentVideoId = null;
+        var verifyToken = null;
         
         document.getElementById('send-btn').addEventListener('click', sendCode);
         document.getElementById('verify-btn').addEventListener('click', verifyCode);
+        
+        function sendCode() {
+            var email = document.getElementById('email-input').value;
+            if (!email || email.indexOf('@') === -1) { alert('Bitte E-Mail eingeben'); return; }
+            
+            document.getElementById('send-btn').disabled = true;
+            document.getElementById('send-btn').textContent = 'Wird gesendet...';
+            
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/auth/send-code', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        var data = JSON.parse(xhr.responseText);
+                        if (data.success) {
+                            verifyToken = data.verify_token;
+                            document.getElementById('otp-section').style.display = 'block';
+                            document.getElementById('send-btn').textContent = 'Code gesendet!';
+                        } else {
+                            alert('Fehler: ' + data.error);
+                            document.getElementById('send-btn').disabled = false;
+                            document.getElementById('send-btn').textContent = 'Code senden';
+                        }
+                    } else {
+                        alert('Fehler beim Senden');
+                        document.getElementById('send-btn').disabled = false;
+                        document.getElementById('send-btn').textContent = 'Code senden';
+                    }
         document.getElementById('upload-file').addEventListener('click', function() { document.getElementById('file').click(); });
         document.getElementById('file').addEventListener('change', handleFile);
         document.getElementById('upload-url').addEventListener('click', showUrlInput);
@@ -212,18 +265,22 @@ HTML = '''<!DOCTYPE html>
             xhr.open('POST', '/api/auth/verify', true);
             xhr.setRequestHeader('Content-Type', 'application/json');
             xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4 && xhr.status === 200) {
-                    var data = JSON.parse(xhr.responseText);
-                    if (data.success) {
-                        localStorage.setItem('highlight_token', data.token);
-                        user = data.user;
-                        showLoggedIn();
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        var data = JSON.parse(xhr.responseText);
+                        if (data.success) {
+                            localStorage.setItem('highlight_token', data.token);
+                            user = data.user;
+                            showLoggedIn();
+                        } else {
+                            alert('Falscher Code oder abgelaufen!');
+                        }
                     } else {
-                        alert('Falscher Code!');
+                        alert('Fehler bei der Verifizierung');
                     }
                 }
             };
-            xhr.send(JSON.stringify({email: email, code: code}));
+            xhr.send(JSON.stringify({email: email, code: code, verify_token: verifyToken}));
         }
         
         function logout() {
@@ -382,30 +439,25 @@ def send_code():
         return jsonify({'error': 'Ungültige E-Mail'}), 400
     
     code = generate_code()
-    expires = (datetime.now() + timedelta(minutes=5)).isoformat()
-    users_db[email] = {'code': code, 'expires': expires}
+    verify_token = create_verify_token(email, code)
     
     send_verification_email(email, code)
     
-    return jsonify({'success': True, 'message': 'Code wurde per E-Mail gesendet'})
+    return jsonify({'success': True, 'verify_token': verify_token, 'message': 'Code wurde per E-Mail gesendet'})
 
 @app.route('/api/auth/verify', methods=['POST'])
 def verify_code():
     data = request.get_json()
     email = data.get('email', '').lower().strip()
     code = data.get('code', '')
+    verify_token = data.get('verify_token', '')
     
-    if email not in users_db:
-        return jsonify({'error': 'User nicht gefunden'}), 400
+    # Verify using token
+    info = verify_token(verify_token)
+    if not info:
+        return jsonify({'error': 'Ungültiger Token'}), 400
     
-    user = users_db[email]
-    stored_code = user['code']
-    expires = datetime.fromisoformat(user['expires'])
-    
-    if datetime.now() > expires:
-        return jsonify({'error': 'Code abgelaufen'}), 400
-    
-    if code != stored_code:
+    if info['email'] != email or info['code'] != code:
         return jsonify({'error': 'Falscher Code'}), 400
     
     token = str(uuid.uuid4())
