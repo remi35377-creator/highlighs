@@ -1,6 +1,5 @@
 from flask import Flask, jsonify, request
 import uuid
-import sqlite3
 from datetime import datetime, timedelta
 import random
 import string
@@ -11,20 +10,41 @@ app = Flask(__name__)
 
 RESEND_KEY = os.environ.get('RESEND_API_KEY', 're_6rbaVj9Q_HsW3ohbAPUGtBjv5wL9LtT1w')
 
-# In-memory storage for Vercel (serverless)
 users_db = {}
 sessions_db = {}
 videos_db = {}
+
+def generate_code():
+    return ''.join(random.choices(string.digits, k=6))
+
+def send_verification_email(email, code):
+    try:
+        r = requests.post('https://api.resend.com/emails', {
+            'from': 'Highlight AI <onboarding@resend.dev>',
+            'to': email,
+            'subject': '🔐 Dein Bestätigungscode für Highlight AI',
+            'html': f'''
+            <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; background: #0a0a0f; color: #fff;">
+                <h1 style="color: #8b5cf6;">⚡ Highlight AI</h1>
+                <p>Dein Bestätigungscode:</p>
+                <div style="background: #15151f; padding: 20px; border-radius: 10px; text-align: center; font-size: 32px; letter-spacing: 8px; color: #8b5cf6; font-weight: bold;">{code}</div>
+                <p style="color: #666; margin-top: 20px;">Dieser Code ist 5 Minuten gültig.</p>
+            </div>
+            '''
+        }, headers={'Authorization': f'Bearer {RESEND_KEY}'}, timeout=10)
+        return r.status_code == 200
+    except:
+        return False
 
 HTML = '''<!DOCTYPE html>
 <html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Highlight AI - Video Highlights</title>
+    <title>Highlight AI</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Outfit', sans-serif; background: #0a0a0f; color: #fff; min-height: 100vh; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0a0a0f; color: #fff; min-height: 100vh; }
         .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
         header { display: flex; justify-content: space-between; padding: 20px 0; border-bottom: 1px solid rgba(139,92,246,0.15); }
         .logo { display: flex; align-items: center; gap: 12px; }
@@ -34,61 +54,44 @@ HTML = '''<!DOCTYPE html>
         .hero h1 { font-size: 48px; margin-bottom: 16px; }
         .hero h1 .highlight { background: linear-gradient(135deg, #8b5cf6, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .hero p { color: #888; font-size: 18px; }
-        
-        .login-box { max-width: 400px; margin: 40px auto; padding: 40px; background: #15151f; border-radius: 16px; position: relative; }
-        .login-input { width: 100%; padding: 16px; margin-bottom: 16px; background: #1a1a25; border: 1px solid rgba(139,92,246,0.3); border-radius: 10px; color: #fff; font-size: 16px; display: block; }
-        .login-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #8b5cf6, #c084fc); border: none; border-radius: 10px; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; }
-        .btn-primary { width: 100%; padding: 16px; background: linear-gradient(135deg, #8b5cf6, #c084fc); border: none; border-radius: 10px; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; }
-        .otp-input { width: 100%; padding: 16px; margin-bottom: 16px; background: #1a1a25; border: 1px solid rgba(139,92,246,0.3); border-radius: 10px; color: #fff; font-size: 24px; text-align: center; letter-spacing: 8px; font-family: monospace; }
-        .otp-section { display: none; }
-        .text-center { text-align: center; }
-        
+        .login-box { max-width: 400px; margin: 40px auto; padding: 40px; background: #15151f; border-radius: 16px; }
+        .login-input { width: 100%; padding: 16px; margin-bottom: 16px; background: #1a1a25; border: 1px solid rgba(139,92,246,0.3); border-radius: 10px; color: #fff; font-size: 16px; box-sizing: border-box; }
+        .login-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #8b5cf6, #c084fc); border: none; border-radius: 10px; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; box-sizing: border-box; }
+        .otp-input { width: 100%; padding: 16px; margin-bottom: 16px; background: #1a1a25; border: 1px solid rgba(139,92,246,0.3); border-radius: 10px; color: #fff; font-size: 24px; text-align: center; letter-spacing: 8px; font-family: monospace; box-sizing: border-box; }
+        .otp-section { display: none; margin-top: 24px; }
         .user-bar { display: flex; align-items: center; gap: 12px; }
         .user-email { font-size: 14px; color: #888; }
         .logout-btn { padding: 8px 16px; background: transparent; border: 1px solid rgba(139,92,246,0.3); border-radius: 8px; color: #888; cursor: pointer; }
-        
         .upload-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 40px; }
-        .upload-card { background: #15151f; border: 2px dashed rgba(139,92,246,0.4); border-radius: 16px; padding: 40px; text-align: center; cursor: pointer; transition: 0.3s; }
-        .upload-card:hover { border-color: #8b5cf6; transform: translateY(-5px); }
+        .upload-card { background: #15151f; border: 2px dashed rgba(139,92,246,0.4); border-radius: 16px; padding: 40px; text-align: center; cursor: pointer; }
+        .upload-card:hover { border-color: #8b5cf6; }
         .upload-card-icon { font-size: 40px; margin-bottom: 12px; }
         .upload-card h3 { font-size: 16px; margin-bottom: 8px; }
         .upload-card p { font-size: 13px; color: #888; }
-        
         .progress { display: none; margin-top: 30px; padding: 24px; background: #15151f; border-radius: 16px; }
         .progress.active { display: block; }
-        .progress-fill { height: 8px; background: linear-gradient(135deg, #8b5cf6, #c084fc); border-radius: 4px; width: 0%; transition: 0.3s; }
-        
+        .progress-fill { height: 8px; background: linear-gradient(135deg, #8b5cf6, #c084fc); border-radius: 4px; width: 0%; }
         .dashboard { display: none; margin-top: 40px; }
         .dashboard.active { display: block; }
         .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 40px; }
         .metric-card { background: #15151f; border-radius: 14px; padding: 20px; }
         .metric-title { font-size: 13px; color: #888; margin-bottom: 8px; }
-        .metric-value { font-size: 28px; font-weight: 700; background: linear-gradient(135deg, #8b5cf6, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        
+        .metric-value { font-size: 28px; font-weight: 700; color: #8b5cf6; }
         .highlights-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
         .highlight-card { background: #15151f; border-radius: 14px; overflow: hidden; }
         .highlight-video { height: 140px; background: #1a1a25; display: flex; align-items: center; justify-content: center; position: relative; }
-        .highlight-play { width: 50px; height: 50px; background: rgba(139,92,246,0.3); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
         .highlight-duration { position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.8); padding: 4px 8px; border-radius: 6px; }
         .highlight-score { position: absolute; top: 10px; left: 10px; background: rgba(139,92,246,0.9); padding: 6px 10px; border-radius: 8px; }
         .highlight-content { padding: 16px; }
-        .highlight-metrics { display: flex; gap: 8px; margin-bottom: 10px; }
-        .highlight-metric { padding: 4px 8px; background: #1a1a25; border-radius: 6px; font-size: 11px; color: #888; }
         .highlight-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
-        .action-btn { padding: 10px; border: 1px solid rgba(139,92,246,0.3); border-radius: 8px; background: transparent; color: #888; font-size: 13px; cursor: pointer; width: 100%; }
-        
         .history-section { margin-top: 60px; }
         .history-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
         .history-card { background: #15151f; border-radius: 14px; padding: 16px; cursor: pointer; }
-        .history-card:hover { border: 1px solid rgba(139,92,246,0.5); }
         .history-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
         .history-date { font-size: 12px; color: #888; }
-        
         input[type="file"] { display: none; }
-        .login-input { display: block; width: 100%; }
         @media (max-width: 768px) { .upload-grid, .metrics-grid, .highlights-grid, .history-grid { grid-template-columns: 1fr; } }
     </style>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div class="container">
@@ -103,26 +106,24 @@ HTML = '''<!DOCTYPE html>
                 <p>KI-gestützte Video-Analyse</p>
             </div>
             
-            <!-- Login -->
             <div class="login-box" id="login-box">
-                <h2>🔐 Anmelden</h2>
+                <h2 style="margin-bottom:24px;text-align:center;">🔐 Anmelden</h2>
                 <input type="email" id="email-input" class="login-input" placeholder="Deine E-Mail-Adresse" />
-                <button type="button" id="send-btn" class="btn-primary" onclick="sendCode()">Code senden</button>
+                <button type="button" class="login-btn" id="send-btn">Code senden</button>
                 
-                <div id="otp-section" style="display:none; margin-top:24px;">
-                    <p class="text-center" style="color:#888; margin-bottom:16px;">Gib den Code ein, den du per E-Mail erhalten hast</p>
+                <div class="otp-section" id="otp-section">
+                    <p style="color:#888;margin-bottom:16px;text-align:center;">Gib den Code ein, den du per E-Mail erhalten hast</p>
                     <input type="text" id="otp-input" class="otp-input" placeholder="XXXXXX" maxlength="6" />
-                    <button type="button" class="btn-primary" onclick="verifyCode()">Bestätigen</button>
+                    <button type="button" class="login-btn" id="verify-btn">Bestätigen</button>
                 </div>
             </div>
             
-            <!-- Main -->
             <div id="main-content" style="display:none;">
                 <div class="upload-grid">
-                    <div class="upload-card" onclick="document.getElementById('file').click()">
+                    <div class="upload-card" id="upload-file">
                         <div class="upload-card-icon">💾</div><h3>Dateiupload</h3><p>Von deinem Gerät</p>
                     </div>
-                    <div class="upload-card" onclick="showUrlInput()">
+                    <div class="upload-card" id="upload-url">
                         <div class="upload-card-icon">🔗</div><h3>URL Import</h3><p>Von Web-URL</p>
                     </div>
                     <div class="upload-card">
@@ -130,10 +131,10 @@ HTML = '''<!DOCTYPE html>
                     </div>
                 </div>
                 
-                <input type="file" id="file" accept="video/*" onchange="handleFile(event)">
+                <input type="file" id="file" accept="video/*" />
                 
                 <div class="progress" id="progress">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                    <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
                         <span id="progress-filename"></span>
                         <span id="progress-percent" style="color:#8b5cf6;">0%</span>
                     </div>
@@ -162,51 +163,67 @@ HTML = '''<!DOCTYPE html>
     </div>
     
     <script>
-        let user = null;
-        let currentVideoId = null;
+        var user = null;
+        var currentVideoId = null;
         
-        async function sendCode() {
-            console.log('sendCode called');
-            const email = document.getElementById('email-input').value;
-            console.log('Email:', email);
-            if (!email || !email.includes('@')) { alert('Bitte E-Mail eingeben'); return; }
+        document.getElementById('send-btn').addEventListener('click', sendCode);
+        document.getElementById('verify-btn').addEventListener('click', verifyCode);
+        document.getElementById('upload-file').addEventListener('click', function() { document.getElementById('file').click(); });
+        document.getElementById('file').addEventListener('change', handleFile);
+        document.getElementById('upload-url').addEventListener('click', showUrlInput);
+        
+        function sendCode() {
+            var email = document.getElementById('email-input').value;
+            if (!email || email.indexOf('@') === -1) { alert('Bitte E-Mail eingeben'); return; }
             
             document.getElementById('send-btn').disabled = true;
             document.getElementById('send-btn').textContent = 'Wird gesendet...';
             
-            try {
-                const res = await fetch('/api/auth/send-code', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email})});
-                console.log('Response status:', res.status);
-                const data = await res.json();
-                console.log('Response data:', data);
-                
-                if (data.success) {
-                    document.getElementById('otp-section').style.display = 'block';
-                    document.getElementById('send-btn').textContent = 'Code gesendet!';
-                } else {
-                    alert('Fehler: ' + data.error);
-                    document.getElementById('send-btn').disabled = false;
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/auth/send-code', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        var data = JSON.parse(xhr.responseText);
+                        if (data.success) {
+                            document.getElementById('otp-section').style.display = 'block';
+                            document.getElementById('send-btn').textContent = 'Code gesendet!';
+                        } else {
+                            alert('Fehler: ' + data.error);
+                            document.getElementById('send-btn').disabled = false;
+                            document.getElementById('send-btn').textContent = 'Code senden';
+                        }
+                    } else {
+                        alert('Fehler beim Senden');
+                        document.getElementById('send-btn').disabled = false;
+                        document.getElementById('send-btn').textContent = 'Code senden';
+                    }
                 }
-            } catch(e) {
-                console.error('Error:', e);
-                alert('Fehler: ' + e.message);
-            }
+            };
+            xhr.send(JSON.stringify({email: email}));
         }
         
-        async function verifyCode() {
-            const email = document.getElementById('email-input').value;
-            const code = document.getElementById('otp-input').value;
+        function verifyCode() {
+            var email = document.getElementById('email-input').value;
+            var code = document.getElementById('otp-input').value;
             
-            const res = await fetch('/api/auth/verify', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email, code})});
-            const data = await res.json();
-            
-            if (data.success) {
-                localStorage.setItem('highlight_token', data.token);
-                user = data.user;
-                showLoggedIn();
-            } else {
-                alert('Falscher Code!');
-            }
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/auth/verify', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    var data = JSON.parse(xhr.responseText);
+                    if (data.success) {
+                        localStorage.setItem('highlight_token', data.token);
+                        user = data.user;
+                        showLoggedIn();
+                    } else {
+                        alert('Falscher Code!');
+                    }
+                }
+            };
+            xhr.send(JSON.stringify({email: email, code: code}));
         }
         
         function logout() {
@@ -222,135 +239,135 @@ HTML = '''<!DOCTYPE html>
             loadHistory();
         }
         
-        async function loadHistory() {
-            const res = await fetch('/api/history/' + user.email);
-            const videos = await res.json();
-            const grid = document.getElementById('history-grid');
-            if (videos.length === 0) {
-                grid.innerHTML = '<p style="color:#888; grid-column:1/-1;">Noch keine Videos</p>';
-            } else {
-                grid.innerHTML = videos.map(v => '<div class="history-card" onclick="loadVideo(\'' + v.id + '\')"><div class="history-title">' + v.filename + '</div><div class="history-date">' + v.date + '</div></div>').join('');
-            }
+        function loadHistory() {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/history/' + user.email, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    var videos = JSON.parse(xhr.responseText);
+                    var grid = document.getElementById('history-grid');
+                    if (videos.length === 0) {
+                        grid.innerHTML = '<p style="color:#888;">Noch keine Videos</p>';
+                    } else {
+                        var html = '';
+                        for (var i = 0; i < videos.length; i++) {
+                            html += '<div class="history-card" onclick="loadVideo(\\'' + videos[i].id + '\\')"><div class="history-title">' + videos[i].filename + '</div><div class="history-date">' + videos[i].date + '</div></div>';
+                        }
+                        grid.innerHTML = html;
+                    }
+                }
+            };
+            xhr.send();
         }
         
         function loadVideo(vid) {
             currentVideoId = vid;
             document.getElementById('dashboard').classList.add('active');
-            document.getElementById('dashboard').scrollIntoView({behavior:'smooth'});
             loadHighlights(vid);
         }
         
-        function handleFile(event) {
-            const file = event.target.files[0];
+        function handleFile(e) {
+            var file = e.target.files[0];
             if (!file) return;
             
             document.getElementById('progress').classList.add('active');
             document.getElementById('progress-filename').textContent = file.name;
             
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += 3;
-                if (progress > 95) progress = 95;
-                document.getElementById('progress-percent').textContent = progress + '%';
-                document.getElementById('progress-fill').style.width = progress + '%';
-            }, 100);
-            
-            const formData = new FormData();
+            var formData = new FormData();
             formData.append('file', file);
             formData.append('email', user.email);
             formData.append('token', localStorage.getItem('highlight_token'));
             
-            fetch('/api/upload', {method:'POST', body:formData})
-            .then(r => r.json())
-            .then(data => {
-                clearInterval(interval);
-                document.getElementById('progress-fill').style.width = '100%';
-                document.getElementById('progress-percent').textContent = '100%';
-                currentVideoId = data.video_id;
-                
-                let pollCount = 0;
-                const pollInt = setInterval(async () => {
-                    pollCount++;
-                    if (pollCount > 20) { clearInterval(pollInt); return; }
-                    const res = await fetch('/api/video/' + currentVideoId);
-                    const d = await res.json();
-                    if (d.status === 'completed' || d.status === 'uploaded') {
-                        clearInterval(pollInt);
-                        loadHighlights(currentVideoId);
-                        loadHistory();
-                    }
-                }, 1000);
-            });
+            var xhr = new XMLHttpRequest();
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    var percent = Math.round((e.loaded / e.total) * 100);
+                    document.getElementById('progress-percent').textContent = percent + '%';
+                    document.getElementById('progress-fill').style.width = percent + '%';
+                }
+            };
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    var data = JSON.parse(xhr.responseText);
+                    currentVideoId = data.video_id;
+                    loadHighlights(currentVideoId);
+                    loadHistory();
+                }
+            };
+            xhr.open('POST', '/api/upload', true);
+            xhr.send(formData);
         }
         
-        async function loadHighlights(vid) {
-            const res = await fetch('/api/video/' + vid + '/highlights');
-            const highlights = await res.json();
-            
-            document.getElementById('progress').classList.remove('active');
-            document.getElementById('dashboard').classList.add('active');
-            
-            [85, 72, 60, 78, 65, 40].forEach((val, i) => {
-                const ids = ['m-pixel', 'm-motion', 'm-face', 'm-brightness', 'm-contrast', 'm-scene'];
-                let current = 0;
-                setInterval(() => {
-                    current += 2;
-                    if (current > val) current = val;
-                    document.getElementById(ids[i]).textContent = current + '%';
-                    if (current >= val) clearInterval(this);
-                }, 30);
-            });
-            
-            const grid = document.getElementById('highlights-grid');
-            grid.innerHTML = '';
-            highlights.forEach(h => {
-                const dur = h.end_time - h.start_time;
-                grid.innerHTML += '<div class="highlight-card"><div class="highlight-video"><div class="highlight-play">▶</div><div class="highlight-duration">' + Math.floor(dur/60) + ':' + String(Math.floor(dur%60)).padStart(2,'0') + '</div><div class="highlight-score">Score: ' + h.score + '</div></div><div class="highlight-content"><div class="highlight-metrics"><span class="highlight-metric">🖼️ ' + (h.metrics?.pixel||75) + '%</span><span class="highlight-metric">🎯 ' + (h.metrics?.motion||80) + '%</span></div><div class="highlight-title">' + h.title + '</div><button class="action-btn">⬇️ Download</button></div></div>';
-            });
+        function loadHighlights(vid) {
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/video/' + vid + '/highlights', true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    var highlights = JSON.parse(xhr.responseText);
+                    document.getElementById('dashboard').classList.add('active');
+                    
+                    var metrics = [85, 72, 60, 78, 65, 40];
+                    var ids = ['m-pixel', 'm-motion', 'm-face', 'm-brightness', 'm-contrast', 'm-scene'];
+                    for (var i = 0; i < 6; i++) {
+                        (function(idx) {
+                            var current = 0;
+                            var timer = setInterval(function() {
+                                current += 2;
+                                if (current > metrics[idx]) current = metrics[idx];
+                                document.getElementById(ids[idx]).textContent = current + '%';
+                                if (current >= metrics[idx]) clearInterval(timer);
+                            }, 30);
+                        })(i);
+                    }
+                    
+                    var grid = document.getElementById('highlights-grid');
+                    var html = '';
+                    for (var j = 0; j < highlights.length; j++) {
+                        var h = highlights[j];
+                        var dur = h.end_time - h.start_time;
+                        var min = Math.floor(dur / 60);
+                        var sec = Math.floor(dur % 60);
+                        html += '<div class="highlight-card"><div class="highlight-video"><div style="font-size:40px;">▶</div><div class="highlight-duration">' + min + ':' + (sec < 10 ? '0' : '') + sec + '</div><div class="highlight-score">Score: ' + h.score + '</div></div><div class="highlight-content"><div class="highlight-title">' + h.title + '</div></div></div>';
+                    }
+                    grid.innerHTML = html;
+                }
+            };
+            xhr.send();
         }
         
         function showUrlInput() {
-            const url = prompt('Video URL:');
+            var url = prompt('Video URL:');
             if (url) {
-                fetch('/api/upload/url', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({url, email:user.email, token:localStorage.getItem('highlight_token')})})
-                .then(r => r.json())
-                .then(data => { currentVideoId = data.video_id; loadHighlights(data.video_id); });
+                var xhr = new XMLHttpRequest();
+                xhr.open('POST', '/api/upload/url', true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4 && xhr.status === 200) {
+                        var data = JSON.parse(xhr.responseText);
+                        currentVideoId = data.video_id;
+                        loadHighlights(data.video_id);
+                    }
+                };
+                xhr.send(JSON.stringify({url: url, email: user.email, token: localStorage.getItem('highlight_token')}));
             }
         }
         
-        // Check existing session
-        const token = localStorage.getItem('highlight_token');
+        var token = localStorage.getItem('highlight_token');
         if (token) {
-            fetch('/api/auth/check', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({token})})
-            .then(r => r.json())
-            .then(data => { if (data.success) { user = data.user; showLoggedIn(); } });
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/auth/check', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    var data = JSON.parse(xhr.responseText);
+                    if (data.success) { user = data.user; showLoggedIn(); }
+                }
+            };
+            xhr.send(JSON.stringify({token: token}));
         }
     </script>
 </body>
-</html>
-'''
-
-def generate_code():
-    return ''.join(random.choices(string.digits, k=6))
-
-def send_verification_email(email, code):
-    try:
-        r = requests.post('https://api.resend.com/emails', {
-            'from': 'Highlight AI <onboarding@resend.dev>',
-            'to': email,
-            'subject': '🔐 Dein Bestätigungscode für Highlight AI',
-            'html': f'''
-            <div style="font-family: sans-serif; max-width: 500px; margin: 0 auto; padding: 20px;">
-                <h1 style="color: #8b5cf6;">⚡ Highlight AI</h1>
-                <p>Dein Bestätigungscode:</p>
-                <div style="background: #15151f; padding: 20px; border-radius: 10px; text-align: center; font-size: 32px; letter-spacing: 8px; color: #8b5cf6; font-weight: bold;">{code}</div>
-                <p style="color: #666; margin-top: 20px;">Dieser Code ist 5 Minuten gültig.</p>
-            </div>
-            '''
-        }, headers={'Authorization': f'Bearer {RESEND_KEY}'}, timeout=10)
-        return r.status_code == 200
-    except:
-        return False
+</html>'''
 
 @app.route('/')
 def home():
@@ -419,11 +436,11 @@ def upload():
         return jsonify({'error': 'Not logged in'}), 401
     
     video_id = str(uuid.uuid4())
-    filename = request.files['file'].filename[:100]
+    filename = request.files['file'].filename[:100] if request.files['file'].filename else 'video.mp4'
     
-    videos_db[video_id] = {'email': email, 'filename': filename, 'date': datetime.now().isoformat(), 'status': 'processing'}
+    videos_db[video_id] = {'email': email, 'filename': filename, 'date': datetime.now().isoformat(), 'status': 'uploaded'}
     
-    return jsonify({'video_id': video_id, 'status': 'processing'})
+    return jsonify({'video_id': video_id, 'status': 'uploaded'})
 
 @app.route('/api/upload/url', methods=['POST'])
 def upload_url():
@@ -436,9 +453,9 @@ def upload_url():
         return jsonify({'error': 'Not logged in'}), 401
     
     video_id = str(uuid.uuid4())
-    videos_db[video_id] = {'email': email, 'filename': url.split('/')[-1][:100], 'date': datetime.now().isoformat(), 'status': 'processing'}
+    videos_db[video_id] = {'email': email, 'filename': url.split('/')[-1][:100], 'date': datetime.now().isoformat(), 'status': 'uploaded'}
     
-    return jsonify({'video_id': video_id, 'status': 'processing'})
+    return jsonify({'video_id': video_id, 'status': 'uploaded'})
 
 @app.route('/api/video/<vid>')
 def get_video(vid):
@@ -450,9 +467,9 @@ def get_video(vid):
 @app.route('/api/video/<vid>/highlights')
 def highlights(vid):
     return jsonify([
-        {'id': '1', 'start_time': 0, 'end_time': 30, 'score': 95, 'title': 'Action-Höhepunkt', 'metrics': {'pixel': 85, 'motion': 90}},
-        {'id': '2', 'start_time': 30, 'end_time': 60, 'score': 85, 'title': 'Emotionales Highlight', 'metrics': {'pixel': 75, 'motion': 70}},
-        {'id': '3', 'start_time': 60, 'end_time': 90, 'score': 75, 'title': 'Szenenwechsel', 'metrics': {'pixel': 80, 'motion': 75}},
+        {'id': '1', 'start_time': 0, 'end_time': 30, 'score': 95, 'title': 'Action-Höhepunkt'},
+        {'id': '2', 'start_time': 30, 'end_time': 60, 'score': 85, 'title': 'Emotionales Highlight'},
+        {'id': '3', 'start_time': 60, 'end_time': 90, 'score': 75, 'title': 'Szenenwechsel'},
     ])
 
 @app.route('/api/history/<email>')
@@ -461,3 +478,6 @@ def history(email):
     videos = [{'id': vid, 'filename': v['filename'], 'date': v['date'][:10], 'status': v['status']} 
              for vid, v in videos_db.items() if v.get('email') == email]
     return jsonify(videos)
+
+if __name__ == '__main__':
+    app.run(debug=True)
