@@ -130,12 +130,12 @@ HTML = '''<!DOCTYPE html>
             <div class="login-box" id="login-box">
                 <h2 style="margin-bottom:24px;text-align:center;">🔐 Anmelden</h2>
                 <input type="email" id="email-input" class="login-input" placeholder="Deine E-Mail-Adresse" />
-                <button type="button" class="login-btn" id="send-btn">Code senden</button>
+                <button type="button" class="login-btn" id="send-btn" onclick="sendCode()">Code senden</button>
                 
                 <div class="otp-section" id="otp-section">
                     <p style="color:#888;margin-bottom:16px;text-align:center;">Gib den Code ein, den du per E-Mail erhalten hast</p>
                     <input type="text" id="otp-input" class="otp-input" placeholder="XXXXXX" maxlength="6" />
-                    <button type="button" class="login-btn" id="verify-btn">Bestätigen</button>
+                    <button type="button" class="login-btn" id="verify-btn" onclick="verifyCode()">Bestätigen</button>
                 </div>
             </div>
             
@@ -188,7 +188,6 @@ HTML = '''<!DOCTYPE html>
         var currentVideoId = null;
         var verifyToken = null;
         
-        document.getElementById('send-btn').addEventListener('click', sendCode);
         document.getElementById('verify-btn').addEventListener('click', verifyCode);
         document.getElementById('upload-file').addEventListener('click', function() { document.getElementById('file').click(); });
         document.getElementById('file').addEventListener('change', handleFile);
