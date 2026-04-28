@@ -25,7 +25,7 @@ def create_verify_token(email, code):
     signature = hmac.new(SECRET_KEY.encode(), data.encode(), hashlib.sha256).hexdigest()
     return data + '.' + signature
 
-def verify_token(token):
+def decode_verify_token(token):
     try:
         data, signature = token.rsplit('.', 1)
         expected = hmac.new(SECRET_KEY.encode(), data.encode(), hashlib.sha256).hexdigest()
@@ -422,7 +422,7 @@ def verify_code():
     code = data.get('code', '')
     verify_token = data.get('verify_token', '')
     
-    info = verify_token(verify_token)
+    info = decode_verify_token(verify_token)
     if not info:
         return jsonify({'error': 'Ungültiger Token'}), 400
     
