@@ -211,6 +211,7 @@ HTML = '''<!DOCTYPE html>
                         verifyToken = data.verify_token;
                         document.getElementById('otp-section').style.display = 'block';
                         btn.textContent = 'Code gesendet!';
+                        alert('Dein Code ist: ' + data.code + '\n(Der Code wurde auch per E-Mail gesendet)');
                     } else {
                         alert('Fehler: ' + data.error);
                         btn.disabled = false;
@@ -413,7 +414,7 @@ def send_code():
     
     send_verification_email(email, code)
     
-    return jsonify({'success': True, 'verify_token': verify_token, 'message': 'Code wurde per E-Mail gesendet'})
+    return jsonify({'success': True, 'verify_token': verify_token, 'code': code, 'message': 'Code wurde per E-Mail gesendet'})
 
 @app.route('/api/auth/verify', methods=['POST'])
 def verify_code():
