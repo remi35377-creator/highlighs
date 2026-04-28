@@ -21,7 +21,7 @@ def generate_code():
     return ''.join(random.choices(string.digits, k=6))
 
 def create_verify_token(email, code):
-    data = json.dumps({'email': email, 'code': code, 'exp': datetime.now().timestamp() + 300})
+    data = json.dumps({'email': email, 'code': code, 'exp': datetime.now().timestamp() + 3600})
     signature = hmac.new(SECRET_KEY.encode(), data.encode(), hashlib.sha256).hexdigest()
     return data + '.' + signature
 
@@ -211,7 +211,6 @@ HTML = '''<!DOCTYPE html>
                         verifyToken = data.verify_token;
                         document.getElementById('otp-section').style.display = 'block';
                         btn.textContent = 'Code gesendet!';
-                        alert('Dein Code ist: ' + data.code + '\n(Der Code wurde auch per E-Mail gesendet)');
                     } else {
                         alert('Fehler: ' + data.error);
                         btn.disabled = false;
@@ -414,7 +413,7 @@ def send_code():
     
     send_verification_email(email, code)
     
-    return jsonify({'success': True, 'verify_token': verify_token, 'code': code, 'message': 'Code wurde per E-Mail gesendet'})
+    return jsonify({'success': True, 'verify_token': verify_token, 'message': 'Code wurde per E-Mail gesendet'})
 
 @app.route('/api/auth/verify', methods=['POST'])
 def verify_code():
