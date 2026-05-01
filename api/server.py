@@ -55,6 +55,10 @@ def analyze_video_metrics(video_path):
         if duration <= 0:
             duration = 30
         
+        # FÜR GROSSE VIDEOS: Nur die ersten 60 Sekunden analysieren
+        max_frames_to_analyze = min(frame_count, int(fps * 60)) if fps > 0 else 600
+        frames_analyzed = 0
+        
         # Audio-Analyse mit ffprobe
         audio_info = {'audio_tracks': 1, 'audio_channels': 2, 'audio_codec': 'AAC', 'sample_rate': '48kHz'}
         try:
@@ -92,7 +96,9 @@ def analyze_video_metrics(video_path):
             if not ret:
                 break
             
-            if frame_idx % 10 == 0:
+            frames_analyzed += 1
+            
+            if frame_idx % 10 == 0 and frames_analyzed <= max_frames_to_analyze:
                 gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 
                 # Pixel-Änderungen
@@ -113,7 +119,7 @@ def analyze_video_metrics(video_path):
                 prev_gray = gray
             
             frame_idx += 1
-            if frame_idx > 500:  # Max 500 Frames für Speed
+            if frames_analyzed >= max_frames_to_analyze:
                 break
         
         cap.release()
