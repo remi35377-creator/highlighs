@@ -19,9 +19,10 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def analyze_video_metrics(video_path):
     """Echtes Video analysieren mit OpenCV + Audio-Analyse"""
     import os
+    import sys
     
-    print(f"\n=== VIDEO ANALYSIS DEBUG ===")
-    print(f"Video path: {video_path}")
+    print(f"\n=== VIDEO ANALYSIS DEBUG ===", flush=True)
+    print(f"Video path: {video_path}", flush=True)
     
     # Prüfe ob Datei existiert
     if not os.path.exists(video_path):
@@ -267,13 +268,18 @@ def find_highlights(video_path, metrics):
 # Analyse im Hintergrund starten
 def process_video_async(video_id, video_path, email):
     """Video im Hintergrund analysieren"""
+    print(f"\n>>> STARTING VIDEO PROCESSING for {video_id}")
+    print(f">>> Video path: {video_path}")
+    
     try:
         # Metriken analysieren
         metrics = analyze_video_metrics(video_path)
+        print(f">>> Metrics result: {metrics}")
         
         if metrics:
             # Highlights finden
             highlights = find_highlights(video_path, metrics)
+            print(f">>> Found {len(highlights)} highlights")
             
             # Ergebnisse speichern
             videos_db[video_id] = {
@@ -284,10 +290,14 @@ def process_video_async(video_id, video_path, email):
                 'metrics': metrics,
                 'highlights': highlights
             }
+            print(f">>> Video processing COMPLETED!")
         else:
+            print(">>> Metrics returned None - marking as failed")
             videos_db[video_id]['status'] = 'failed'
     except Exception as e:
-        print(f"Error processing video: {e}")
+        print(f">>> ERROR processing video: {e}")
+        import traceback
+        traceback.print_exc()
         videos_db[video_id]['status'] = 'failed'
 
 # In-Memory Database
@@ -696,7 +706,10 @@ def upload():
     
     print("Starting async video processing...")
     # Video im Hintergrund analysieren
-    threading.Thread(target=process_video_async, args=(video_id, video_path, email)).start()
+    thread = threading.Thread(target=process_video_async, args=(video_id, video_path, email))
+    thread.start()
+    print("Thread started, returning response...")
+    import sys; sys.stdout.flush()
     
     return jsonify({'video_id': video_id, 'status': 'processing'})
 
