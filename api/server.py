@@ -599,9 +599,30 @@ def upload():
     file = request.files['file']
     filename = file.filename[:100] if file.filename else 'video.mp4'
     
+    # Prüfe Dateigröße
+    content_length = request.content_length
+    if content_length and content_length > 5 * 1024 * 1024 * 1024:  # Mehr als 5GB
+        return jsonify({'error': 'Datei zu groß. Max 5GB erlaubt.'}), 400
+    
     video_id = str(uuid.uuid4())
-    video_path = os.path.join(UPLOAD_FOLDER, video_id + '_' + filename)
-    file.save(video_path)
+    
+    # Erstelle Ordner für Uploads
+    upload_dir = os.path.join(UPLOAD_FOLDER, video_id)
+    os.makedirs(upload_dir, exist_ok=True)
+    
+    video_path = os.path.join(upload_dir, filename)
+    
+    # Stream die Datei in Chunks
+    try:
+        with open(video_path, 'wb') as f:
+            chunk_size = 1024 * 1024  # 1MB chunks
+            while True:
+                chunk = file.read(chunk_size)
+                if not chunk:
+                    break
+                f.write(chunk)
+    except Exception as e:
+        return jsonify({'error': f'Upload fehlgeschlagen: {str(e)}'}), 500
     
     videos_db[video_id] = {
         'email': email,
