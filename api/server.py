@@ -20,8 +20,12 @@ def analyze_video_metrics(video_path):
     """Echtes Video analysieren mit OpenCV + Audio-Analyse"""
     import os
     
+    print(f"\n=== VIDEO ANALYSIS DEBUG ===")
+    print(f"Video path: {video_path}")
+    
     # Prüfe ob Datei existiert
     if not os.path.exists(video_path):
+        print("ERROR: File does not exist!")
         return {
             'pixel': 75, 'motion': 80, 'brightness': 50, 
             'contrast': 60, 'scene': 40, 'duration': 30,
@@ -30,7 +34,10 @@ def analyze_video_metrics(video_path):
     
     # Prüfe Dateigröße
     file_size = os.path.getsize(video_path)
+    print(f"File size: {file_size} bytes ({file_size/1024/1024:.2f} MB)")
+    
     if file_size < 10000:  # Weniger als 10KB = wahrscheinlich fehlerhaft
+        print("ERROR: File too small (<10KB) - likely corrupted!")
         return {
             'pixel': 75, 'motion': 80, 'brightness': 50, 
             'contrast': 60, 'scene': 40, 'duration': 30,
@@ -38,14 +45,17 @@ def analyze_video_metrics(video_path):
         }
     
     # Prüfe ob Video-Datei lesbar ist (ffprobe-check)
+    print("Running ffprobe validation...")
     try:
         result = subprocess.run([
-            'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+            'ffprobe', '-v', 'error', '-show_entries', 'format=duration,format_name',
             '-of', 'json', video_path
         ], capture_output=True, text=True, timeout=10)
         
+        print(f"ffprobe return code: {result.returncode}")
+        
         if result.returncode != 0:
-            print("Video file not readable by ffprobe - using fallback")
+            print(f"ERROR: ffprobe failed! stderr: {result.stderr}")
             return {
                 'pixel': 75, 'motion': 80, 'brightness': 50, 
                 'contrast': 60, 'scene': 40, 'duration': 30,
@@ -54,9 +64,18 @@ def analyze_video_metrics(video_path):
         
         import json
         data = json.loads(result.stdout)
+        print(f"ffprobe output: {data}")
         duration_val = float(data.get('format', {}).get('duration', 0))
+        print(f"Video duration from ffprobe: {duration_val}s")
+    except subprocess.TimeoutExpired:
+        print("ERROR: ffprobe timed out!")
+        return {
+            'pixel': 75, 'motion': 80, 'brightness': 50, 
+            'contrast': 60, 'scene': 40, 'duration': 30,
+            'audio_tracks': 1, 'audio_channels': 2, 'audio_codec': 'AAC'
+        }
     except Exception as e:
-        print(f"ffprobe check failed: {e} - using fallback")
+        print(f"ERROR: ffprobe exception: {e}")
         return {
             'pixel': 75, 'motion': 80, 'brightness': 50, 
             'contrast': 60, 'scene': 40, 'duration': 30,
@@ -64,10 +83,11 @@ def analyze_video_metrics(video_path):
         }
     
     try:
+        print("Opening with OpenCV...")
         cap = cv2.VideoCapture(video_path)
         
         if not cap.isOpened():
-            print("Video cannot be opened - using fallback")
+            print("ERROR: OpenCV cannot open video!")
             return {
                 'pixel': 75, 'motion': 80, 'brightness': 50, 
                 'contrast': 60, 'scene': 40, 'duration': 30,
@@ -76,6 +96,8 @@ def analyze_video_metrics(video_path):
         
         fps = cap.get(cv2.CAP_PROP_FPS)
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        print(f"OpenCV: fps={fps}, frames={frame_count}")
+        
         duration = frame_count / fps if fps > 0 else duration_val
         
         if duration <= 0:
@@ -179,12 +201,14 @@ return {
             'sample_rate': audio_info['sample_rate']
         }
     except Exception as e:
-        print(f"Video analysis error: {e}")
+        print(f"Video analysis exception: {e}")
         return {
             'pixel': 75, 'motion': 80, 'brightness': 50, 
             'contrast': 60, 'scene': 40, 'duration': 30,
             'audio_tracks': 1, 'audio_channels': 2, 'audio_codec': 'AAC'
         }
+    finally:
+        print("=== ANALYSIS COMPLETE ===\n")
     
     return {
         'pixel': pixel_score,
@@ -621,6 +645,7 @@ def home():
 
 @app.route('/api/upload', methods=['POST'])
 def upload():
+    print("\n=== UPLOAD REQUEST RECEIVED ===")
     if 'file' not in request.files:
         return jsonify({'error': 'No file'}), 400
     
@@ -630,13 +655,16 @@ def upload():
     
     file = request.files['file']
     filename = file.filename[:100] if file.filename else 'video.mp4'
+    print(f"Upload: email={email}, filename={filename}")
     
     # Prüfe Dateigröße
     content_length = request.content_length
+    print(f"Content-Length: {content_length}")
     if content_length and content_length > 5 * 1024 * 1024 * 1024:  # Mehr als 5GB
         return jsonify({'error': 'Datei zu groß. Max 5GB erlaubt.'}), 400
     
     video_id = str(uuid.uuid4())
+    print(f"Video ID: {video_id}")
     
     # Erstelle Ordner für Uploads
     upload_dir = os.path.join(UPLOAD_FOLDER, video_id)
@@ -646,6 +674,7 @@ def upload():
     
     # Stream die Datei in Chunks
     try:
+        print("Starting file upload...")
         with open(video_path, 'wb') as f:
             chunk_size = 1024 * 1024  # 1MB chunks
             while True:
@@ -653,7 +682,9 @@ def upload():
                 if not chunk:
                     break
                 f.write(chunk)
+        print(f"File saved to: {video_path}")
     except Exception as e:
+        print(f"Upload failed: {e}")
         return jsonify({'error': f'Upload fehlgeschlagen: {str(e)}'}), 500
     
     videos_db[video_id] = {
@@ -663,6 +694,7 @@ def upload():
         'status': 'processing'
     }
     
+    print("Starting async video processing...")
     # Video im Hintergrund analysieren
     threading.Thread(target=process_video_async, args=(video_id, video_path, email)).start()
     
