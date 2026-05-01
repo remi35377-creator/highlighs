@@ -189,7 +189,7 @@ def analyze_video_metrics(video_path):
                            if abs(brightness_values[i] - brightness_values[i-1]) > 30) if brightness_values else 4
         scene_score = min(100, scene_changes * 10)
         
-return {
+        return {
             'pixel': pixel_score,
             'motion': motion_score,
             'brightness': brightness_score,
@@ -210,15 +210,7 @@ return {
         }
     finally:
         print("=== ANALYSIS COMPLETE ===\n")
-    
-    return {
-        'pixel': pixel_score,
-        'motion': motion_score,
-        'brightness': brightness_score,
-        'contrast': contrast_score,
-        'scene': scene_score,
-        'duration': int(duration)
-    }
+
 
 def find_highlights(video_path, metrics):
     """Highlight-Clips finden basierend auf Metriken"""
