@@ -705,11 +705,9 @@ def upload():
     }
     
     print("Starting async video processing...")
-    # Video im Hintergrund analysieren
-    thread = threading.Thread(target=process_video_async, args=(video_id, video_path, email))
-    thread.start()
-    print("Thread started, returning response...")
-    import sys; sys.stdout.flush()
+    # FÜR DEBUG: Synchron statt async (entfernen nach Test)
+    process_video_async(video_id, video_path, email)
+    print("Video processing done, returning response...")
     
     return jsonify({'video_id': video_id, 'status': 'processing'})
 
