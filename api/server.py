@@ -221,45 +221,214 @@ HTML = '''<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Highlight AI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; background: #0a0a0f; color: #fff; min-height: 100vh; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        header { display: flex; justify-content: space-between; padding: 20px 0; border-bottom: 1px solid rgba(139,92,246,0.15); }
-        .logo { display: flex; align-items: center; gap: 12px; font-size: 24px; font-weight: bold; background: linear-gradient(135deg, #8b5cf6, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .hero { text-align: center; padding: 60px 0; }
-        .hero h1 { font-size: 48px; margin-bottom: 16px; }
-        .hero h1 .highlight { background: linear-gradient(135deg, #8b5cf6, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .hero p { color: #888; font-size: 18px; }
-        .box { max-width: 400px; margin: 40px auto; padding: 40px; background: #15151f; border-radius: 16px; }
-        input { width: 100%; padding: 16px; margin: 10px 0; background: #1a1a25; border: 1px solid rgba(139,92,246,0.3); color: #fff; border-radius: 10px; }
-        button { width: 100%; padding: 16px; background: linear-gradient(135deg, #8b5cf6, #c084fc); border: none; color: #fff; cursor: pointer; border-radius: 10px; font-size: 16px; font-weight: 600; }
-        #otp { display: none; }
-        .main { display: none; }
-        .upload-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 40px; }
-        .upload-card { background: #15151f; border: 2px dashed rgba(139,92,246,0.4); border-radius: 16px; padding: 40px; text-align: center; cursor: pointer; }
-        .upload-card:hover { border-color: #8b5cf6; }
-        .upload-icon { font-size: 40px; }
-        .upload-card h3 { margin: 12px 0 8px; }
-        .upload-card p { color: #888; font-size: 13px; }
-        .progress { display: none; margin-top: 30px; padding: 24px; background: #15151f; border-radius: 16px; }
-        .progress.active { display: block; }
-        .progress-fill { height: 8px; background: linear-gradient(135deg, #8b5cf6, #c084fc); border-radius: 4px; width: 0%; }
-        .status { margin-top: 20px; color: #8b5cf6; }
-        .history { margin-top: 60px; }
-        .history h2 { margin-bottom: 20px; }
-        .history-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-        .history-card { background: #15151f; border-radius: 14px; padding: 16px; cursor: pointer; }
+        body { 
+            font-family: 'Inter', -apple-system, sans-serif; 
+            background: #0a0a0f; 
+            color: #fff; 
+            min-height: 100vh;
+            background: linear-gradient(180deg, #0a0a0f 0%, #12121a 100%);
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+        
+        header { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 24px 0;
+            border-bottom: 1px solid rgba(139,92,246,0.15);
+        }
+        .logo { 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+            font-size: 24px; 
+            font-weight: 700; 
+        }
+        .logo-icon { 
+            width: 44px; height: 44px; 
+            background: linear-gradient(135deg, #8b5cf6, #c084fc); 
+            border-radius: 12px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center;
+            font-size: 22px;
+        }
+        .logo-text { 
+            background: linear-gradient(135deg, #8b5cf6, #c084fc); 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent; 
+        }
+        
+        .hero { text-align: center; padding: 80px 0 60px; }
+        .hero h1 { 
+            font-size: 56px; 
+            font-weight: 700; 
+            margin-bottom: 16px; 
+            letter-spacing: -1px;
+        }
+        .hero h1 .highlight { 
+            background: linear-gradient(135deg, #8b5cf6, #c084fc); 
+            -webkit-background-clip: text; 
+            -webkit-text-fill-color: transparent; 
+        }
+        .hero p { 
+            color: #888; 
+            font-size: 20px; 
+            font-weight: 300;
+        }
+        
+        .login-box { 
+            max-width: 440px; 
+            margin: 0 auto; 
+            padding: 48px; 
+            background: #15151f; 
+            border-radius: 24px;
+            border: 1px solid rgba(139,92,246,0.2);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+        }
+        .login-box h2 { 
+            text-align: center; 
+            margin-bottom: 32px; 
+            font-size: 24px;
+        }
+        
+        .form-input { 
+            width: 100%; 
+            padding: 16px 20px; 
+            margin-bottom: 16px; 
+            background: #1a1a25; 
+            border: 1px solid rgba(139,92,246,0.3); 
+            border-radius: 12px; 
+            color: #fff; 
+            font-size: 16px;
+            transition: border-color 0.2s;
+        }
+        .form-input:focus { 
+            outline: none; 
+            border-color: #8b5cf6; 
+        }
+        .form-input::placeholder { 
+            color: #666; 
+        }
+        
+        .btn-primary { 
+            width: 100%; 
+            padding: 16px 24px; 
+            background: linear-gradient(135deg, #8b5cf6, #c084fc); 
+            border: none; 
+            border-radius: 12px; 
+            color: #fff; 
+            font-size: 16px; 
+            font-weight: 600; 
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn-primary:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(139,92,246,0.4);
+        }
+        
+        .otp-section { display: none; margin-top: 24px; }
+        .otp-section p { 
+            color: #888; 
+            text-align: center; 
+            margin-bottom: 16px; 
+        }
+        
+        .upload-section { display: none; padding: 40px 0; }
+        .upload-grid { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 24px; 
+            margin-bottom: 40px; 
+        }
+        .upload-card { 
+            background: #15151f; 
+            border: 2px dashed rgba(139,92,246,0.3); 
+            border-radius: 20px; 
+            padding: 48px 24px; 
+            text-align: center; 
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-card:hover { 
+            border-color: #8b5cf6; 
+            background: #1a1a25;
+            transform: translateY(-4px);
+        }
+        .upload-icon { font-size: 48px; margin-bottom: 16px; }
+        .upload-card h3 { font-size: 18px; margin-bottom: 8px; }
+        .upload-card p { color: #888; font-size: 14px; }
+        
+        .progress-box { 
+            display: none;
+            background: #15151f; 
+            border-radius: 16px; 
+            padding: 24px; 
+            margin-top: 32px;
+        }
+        .progress-box.active { display: block; }
+        .progress-header { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 12px; 
+        }
+        .progress-fill { 
+            height: 8px; 
+            background: rgba(139,92,246,0.2); 
+            border-radius: 4px; 
+            overflow: hidden;
+        }
+        .progress-bar { 
+            height: 100%; 
+            background: linear-gradient(135deg, #8b5cf6, #c084fc); 
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .history-section { margin-top: 60px; }
+        .history-section h2 { margin-bottom: 24px; font-size: 24px; }
+        .history-grid { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 20px; 
+        }
+        .history-card { 
+            background: #15151f; 
+            border-radius: 16px; 
+            padding: 20px; 
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
         .history-card:hover { border: 1px solid rgba(139,92,246,0.5); }
-        .history-title { font-weight: 600; margin-bottom: 8px; }
-        .history-date { color: #888; font-size: 12px; }
+        .history-title { font-weight: 600; margin-bottom: 8px; font-size: 16px; }
+        .history-date { color: #888; font-size: 14px; }
+        
+        .status-text { 
+            margin-top: 24px; 
+            text-align: center; 
+            color: #8b5cf6;
+            font-size: 16px;
+        }
+        
+        @media (max-width: 768px) {
+            .upload-grid, .history-grid { grid-template-columns: 1fr; }
+            .hero h1 { font-size: 36px; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <div class="logo">⚡ Highlight AI</div>
+            <div class="logo">
+                <div class="logo-icon">⚡</div>
+                <span class="logo-text">Highlight AI</span>
+            </div>
         </header>
         
         <main>
@@ -268,38 +437,52 @@ HTML = '''<!DOCTYPE html>
                 <p>KI-gestützte Video-Analyse</p>
             </div>
             
-            <div class="box" id="login">
-                <h2 style="text-align:center; margin-bottom:24px;">🔐 Anmelden</h2>
-                <input type="email" id="email" placeholder="Deine E-Mail-Adresse">
-                <button onclick="send()">Code senden</button>
-                <div id="otp">
-                    <p style="color:#888; margin:16px 0; text-align:center;">Gib den Code ein</p>
-                    <input type="text" id="code" placeholder="XXXXXX" maxlength="6">
-                    <button onclick="verify()">Bestätigen</button>
+            <div class="login-box" id="login-box">
+                <h2>🔐 Anmelden</h2>
+                <input type="email" id="email" class="form-input" placeholder="Deine E-Mail-Adresse">
+                <button class="btn-primary" onclick="send()">Code senden</button>
+                
+                <div class="otp-section" id="otp">
+                    <p>Gib den 6-stelligen Code ein</p>
+                    <input type="text" id="code" class="form-input" placeholder="XXXXXX" maxlength="6" style="text-align:center; letter-spacing:8px; font-size:24px;">
+                    <button class="btn-primary" onclick="verify()">Bestätigen</button>
                 </div>
             </div>
             
-            <div class="main" id="main">
+            <div class="upload-section" id="main">
                 <div class="upload-grid">
-                    <div class="upload-card">
+                    <div class="upload-card" onclick="document.getElementById('file').click()">
                         <div class="upload-icon">💾</div>
                         <h3>Dateiupload</h3>
                         <p>Von deinem Gerät</p>
                     </div>
+                    <div class="upload-card">
+                        <div class="upload-icon">🔗</div>
+                        <h3>URL Import</h3>
+                        <p>Von Web-URL</p>
+                    </div>
+                    <div class="upload-card">
+                        <div class="upload-icon">☁️</div>
+                        <h3>Cloud</h3>
+                        <p>Google Drive, etc.</p>
+                    </div>
                 </div>
+                
                 <input type="file" id="file" accept="video/*" onchange="upload()" style="display:none">
                 
-                <div class="progress" id="progress">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
-                        <span id="filename"></span>
+                <div class="progress-box" id="progress">
+                    <div class="progress-header">
+                        <span id="filename">video.mp4</span>
                         <span id="percent" style="color:#8b5cf6;">0%</span>
                     </div>
-                    <div class="progress-fill" id="fill"></div>
+                    <div class="progress-fill">
+                        <div class="progress-bar" id="bar"></div>
+                    </div>
                 </div>
                 
-                <div class="status" id="status"></div>
+                <div class="status-text" id="status"></div>
                 
-                <div class="history">
+                <div class="history-section">
                     <h2>📺 Meine Videos</h2>
                     <div class="history-grid" id="history"></div>
                 </div>
@@ -315,21 +498,17 @@ HTML = '''<!DOCTYPE html>
         localStorage.setItem('code', c);
         localStorage.setItem('email', e);
         document.getElementById('otp').style.display = 'block';
-        alert('Dein Code ist: ' + c);
+        alert('Dein Code: ' + c);
     }
     function verify() {
         var i = document.getElementById('code').value;
         if(i == localStorage.getItem('code')) {
-            document.getElementById('login').style.display = 'none';
+            document.getElementById('login-box').style.display = 'none';
             document.getElementById('main').style.display = 'block';
             loadHistory();
         } else {
             alert('Falscher Code!');
         }
-    }
-    function logout() {
-        localStorage.clear();
-        location.reload();
     }
     function upload() {
         var f = document.getElementById('file').files[0];
@@ -344,12 +523,12 @@ HTML = '''<!DOCTYPE html>
             if(e.lengthComputable) {
                 var p = Math.round(e.loaded/e.total*100);
                 document.getElementById('percent').innerText = p + '%';
-                document.getElementById('fill').style.width = p + '%';
+                document.getElementById('bar').style.width = p + '%';
             }
         };
         x.onload = function() {
             if(x.status === 200) {
-                document.getElementById('status').innerText = 'Hochgeladen! Video wird analysiert...';
+                document.getElementById('status').innerText = '✓ Hochgeladen! Video wird analysiert...';
             }
         };
         x.open('POST', '/api/upload');
@@ -363,7 +542,7 @@ HTML = '''<!DOCTYPE html>
                 var v = JSON.parse(x.responseText);
                 var h = document.getElementById('history');
                 if(v.length === 0) {
-                    h.innerHTML = '<p style="color:#888;">Noch keine Videos</p>';
+                    h.innerHTML = '<p style="color:#888;">Noch keine Videos hochgeladen</p>';
                 } else {
                     h.innerHTML = '';
                     for(var i=0; i<v.length; i++) {
@@ -374,10 +553,9 @@ HTML = '''<!DOCTYPE html>
         };
         x.send();
     }
-    document.querySelector('.upload-card').onclick = function() { document.getElementById('file').click(); };
     var saved = localStorage.getItem('email');
     if(saved) {
-        document.getElementById('login').style.display = 'none';
+        document.getElementById('login-box').style.display = 'none';
         document.getElementById('main').style.display = 'block';
         loadHistory();
     }
