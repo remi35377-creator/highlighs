@@ -695,6 +695,11 @@ HTML = '''<!DOCTYPE html>
             grid-template-columns: repeat(3, 1fr); 
             gap: 20px; 
         }
+        .highlights-grid { 
+            display: grid; 
+            grid-template-columns: 1fr; 
+            gap: 16px; 
+        }
         .history-card { 
             background: #15151f; 
             border-radius: 16px; 
@@ -780,8 +785,10 @@ HTML = '''<!DOCTYPE html>
                 <div class="status-text" id="status"></div>
                 
                 <div class="history-section">
-                    <h2>📺 Meine Videos</h2>
-                    <div class="history-grid" id="history"></div>
+                    <h2>🎬 Meine Clips</h2>
+                    <div class="highlights-grid" id="highlights-grid">
+                        <p style="color:#888;">Lade ein Video hoch um Clips zu erstellen...</p>
+                    </div>
                 </div>
             </div>
         </main>
@@ -833,22 +840,43 @@ HTML = '''<!DOCTYPE html>
     }
     function loadHistory() {
         var x = new XMLHttpRequest();
-        x.open('GET', '/api/history/' + localStorage.getItem('email'), true);
+        x.open('GET', '/api/latest/' + localStorage.getItem('email'), true);
         x.onreadystatechange = function() {
             if(x.readyState === 4 && x.status === 200) {
-                var v = JSON.parse(x.responseText);
-                var h = document.getElementById('history');
-                if(v.length === 0) {
-                    h.innerHTML = '<p style="color:#888;">Noch keine Videos hochgeladen</p>';
-                } else {
-                    h.innerHTML = '';
-                    for(var i=0; i<v.length; i++) {
-                        h.innerHTML += '<div class="history-card"><div class="history-title">' + v[i].filename + '</div><div class="history-date">' + v[i].date + '</div></div>';
-                    }
+                var data = JSON.parse(x.responseText);
+                var h = document.getElementById('highlights-grid');
+                
+                if(!data.highlights || data.highlights.length === 0) {
+                    h.innerHTML = '<p style="color:#888;">Noch keine Highlights. Lade ein Video hoch!</p>';
+                    return;
+                }
+                
+                h.innerHTML = '';
+                for(var i=0; i<data.highlights.length; i++) {
+                    var clip = data.highlights[i];
+                    var dur = clip.end_time - clip.start_time;
+                    var min = Math.floor(dur / 60);
+                    var sec = Math.floor(dur % 60);
+                    var method = clip.method || 'auto';
+                    
+                    h.innerHTML += '<div class="highlight-card" style="background:#15151f;padding:20px;border-radius:16px;margin-bottom:16px;">' +
+                        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+                        '<div style="font-size:18px;font-weight:600;">' + clip.title + '</div>' +
+                        '<div style="background:#8b5cf6;padding:4px 12px;border-radius:20px;font-size:12px;">' + method + '</div>' +
+                        '</div>' +
+                        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                        '<div><span style="color:#888;">⏱️</span> ' + min + ':' + (sec<10?'0':'') + sec + 
+                        ' | <span style="color:#888;">📊</span> Score: ' + clip.score + 
+                        ' | <span style="color:#888;">🎬</span> ' + clip.start_time + 's - ' + clip.end_time + 's</div>' +
+                        '<button onclick="exportClip(\'' + data.video_id + '\',\'' + clip.id + '\')" style="background:linear-gradient(135deg,#8b5cf6,#c084fc);border:none;padding:10px 20px;border-radius:10px;color:#fff;cursor:pointer;font-weight:600;">⬇️ Export</button>' +
+                        '</div></div>';
                 }
             }
         };
         x.send();
+    }
+    function exportClip(vid, highlightId) {
+        window.open('/api/export/' + vid + '/' + highlightId, '_blank');
     }
     var saved = localStorage.getItem('email');
     if(saved) {
@@ -933,6 +961,79 @@ def get_video_api(vid):
         'metrics': v.get('metrics'),
         'highlights': v.get('highlights', [])
     })
+
+@app.route('/api/video/<vid>/highlights')
+def get_highlights(vid):
+    v = get_video(vid)
+    if not v:
+        return jsonify({'error': 'Not found'}), 404
+    return jsonify(v.get('highlights', []))
+
+@app.route('/api/export/<vid>/<highlight_id>')
+def export_clip(vid, highlight_id):
+    """Export a highlight clip using ffmpeg"""
+    v = get_video(vid)
+    if not v:
+        return jsonify({'error': 'Not found'}), 404
+    
+    highlights = v.get('highlights', [])
+    highlight = None
+    for h in highlights:
+        if h.get('id') == highlight_id:
+            highlight = h
+            break
+    
+    if not highlight:
+        return jsonify({'error': 'Highlight not found'}), 404
+    
+    # Find the video file
+    upload_dir = os.path.join(UPLOAD_FOLDER, vid)
+    video_files = [f for f in os.listdir(upload_dir) if f.endswith(('.mp4', '.mov', '.avi'))]
+    if not video_files:
+        return jsonify({'error': 'Video file not found'}), 404
+    
+    input_path = os.path.join(upload_dir, video_files[0])
+    output_filename = f"highlight_{highlight['start_time']}_{highlight['end_time']}.mp4"
+    output_path = os.path.join(upload_dir, output_filename)
+    
+    start = highlight['start_time']
+    duration = highlight['end_time'] - highlight['start_time']
+    
+    try:
+        subprocess.run([
+            'ffmpeg', '-y', '-i', input_path,
+            '-ss', str(start), '-t', str(duration),
+            '-c', 'copy', output_path
+        ], capture_output=True, timeout=60)
+        
+        if os.path.exists(output_path):
+            return send_file(output_path, as_attachment=True, download_name=output_filename)
+        else:
+            return jsonify({'error': 'Export failed'}), 500
+    except Exception as e:
+        print(f"Export error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/latest/<email>')
+def get_latest(email):
+    """Get latest video with highlights for a user"""
+    email = email.lower()
+    videos = get_user_videos(email)
+    if not videos:
+        return jsonify({'highlights': []})
+    
+    # Get most recent completed video
+    for v in videos:
+        if v.get('status') == 'completed':
+            video_data = get_video(v['id'])
+            if video_data and video_data.get('highlights'):
+                return jsonify({
+                    'video_id': v['id'],
+                    'filename': v['filename'],
+                    'highlights': video_data.get('highlights', [])
+                })
+    
+    return jsonify({'highlights': []})
 
 @app.route('/api/history/<email>')
 def history(email):
