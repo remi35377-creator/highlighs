@@ -37,6 +37,32 @@ def analyze_video_metrics(video_path):
             'audio_tracks': 1, 'audio_channels': 2, 'audio_codec': 'AAC'
         }
     
+    # Prüfe ob Video-Datei lesbar ist (ffprobe-check)
+    try:
+        result = subprocess.run([
+            'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+            '-of', 'json', video_path
+        ], capture_output=True, text=True, timeout=10)
+        
+        if result.returncode != 0:
+            print("Video file not readable by ffprobe - using fallback")
+            return {
+                'pixel': 75, 'motion': 80, 'brightness': 50, 
+                'contrast': 60, 'scene': 40, 'duration': 30,
+                'audio_tracks': 1, 'audio_channels': 2, 'audio_codec': 'AAC'
+            }
+        
+        import json
+        data = json.loads(result.stdout)
+        duration_val = float(data.get('format', {}).get('duration', 0))
+    except Exception as e:
+        print(f"ffprobe check failed: {e} - using fallback")
+        return {
+            'pixel': 75, 'motion': 80, 'brightness': 50, 
+            'contrast': 60, 'scene': 40, 'duration': 30,
+            'audio_tracks': 1, 'audio_channels': 2, 'audio_codec': 'AAC'
+        }
+    
     try:
         cap = cv2.VideoCapture(video_path)
         
@@ -50,7 +76,7 @@ def analyze_video_metrics(video_path):
         
         fps = cap.get(cv2.CAP_PROP_FPS)
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        duration = frame_count / fps if fps > 0 else 30
+        duration = frame_count / fps if fps > 0 else duration_val
         
         if duration <= 0:
             duration = 30
