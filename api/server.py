@@ -159,313 +159,91 @@ def process_video_async(video_id, video_path, email):
 videos_db = {}
 
 HTML = '''<!DOCTYPE html>
-<html lang="de">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Highlight AI</title>
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background: #0a0a0f; color: #fff; min-height: 100vh; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
-        header { display: flex; justify-content: space-between; padding: 20px 0; border-bottom: 1px solid rgba(139,92,246,0.15); }
-        .logo { display: flex; align-items: center; gap: 12px; }
-        .logo-icon { width: 44px; height: 44px; background: linear-gradient(135deg, #8b5cf6, #c084fc); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        .logo-text { font-size: 22px; font-weight: 700; background: linear-gradient(135deg, #8b5cf6, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .hero { text-align: center; padding: 60px 0; }
-        .hero h1 { font-size: 48px; margin-bottom: 16px; }
-        .hero h1 .highlight { background: linear-gradient(135deg, #8b5cf6, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .hero p { color: #888; font-size: 18px; }
-        .login-box { max-width: 400px; margin: 40px auto; padding: 40px; background: #15151f; border-radius: 16px; }
-        .login-input { width: 100%; padding: 16px; margin-bottom: 16px; background: #1a1a25; border: 1px solid rgba(139,92,246,0.3); border-radius: 10px; color: #fff; font-size: 16px; box-sizing: border-box; }
-        .login-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #8b5cf6, #c084fc); border: none; border-radius: 10px; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; box-sizing: border-box; }
-        .otp-input { width: 100%; padding: 16px; margin-bottom: 16px; background: #1a1a25; border: 1px solid rgba(139,92,246,0.3); border-radius: 10px; color: #fff; font-size: 24px; text-align: center; letter-spacing: 8px; font-family: monospace; box-sizing: border-box; }
-        .otp-section { display: none; margin-top: 24px; }
-        .user-bar { display: flex; align-items: center; gap: 12px; }
-        .user-email { font-size: 14px; color: #888; }
-        .logout-btn { padding: 8px 16px; background: transparent; border: 1px solid rgba(139,92,246,0.3); border-radius: 8px; color: #888; cursor: pointer; }
-        .upload-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-top: 40px; }
-        .upload-card { background: #15151f; border: 2px dashed rgba(139,92,246,0.4); border-radius: 16px; padding: 40px; text-align: center; cursor: pointer; }
-        .upload-card:hover { border-color: #8b5cf6; }
-        .upload-card-icon { font-size: 40px; margin-bottom: 12px; }
-        .upload-card h3 { font-size: 16px; margin-bottom: 8px; }
-        .upload-card p { font-size: 13px; color: #888; }
-        .progress { display: none; margin-top: 30px; padding: 24px; background: #15151f; border-radius: 16px; }
-        .progress.active { display: block; }
-        .progress-fill { height: 8px; background: linear-gradient(135deg, #8b5cf6, #c084fc); border-radius: 4px; width: 0%; }
-        .dashboard { display: none; margin-top: 40px; }
-        .dashboard.active { display: block; }
-        .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 40px; }
-        .metric-card { background: #15151f; border-radius: 14px; padding: 20px; }
-        .metric-title { font-size: 13px; color: #888; margin-bottom: 8px; }
-        .metric-value { font-size: 28px; font-weight: 700; color: #8b5cf6; }
-        .highlights-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
-        .highlight-card { background: #15151f; border-radius: 14px; overflow: hidden; }
-        .highlight-video { height: 140px; background: #1a1a25; display: flex; align-items: center; justify-content: center; position: relative; }
-        .highlight-duration { position: absolute; bottom: 10px; right: 10px; background: rgba(0,0,0,0.8); padding: 4px 8px; border-radius: 6px; }
-        .highlight-score { position: absolute; top: 10px; left: 10px; background: rgba(139,92,246,0.9); padding: 6px 10px; border-radius: 8px; }
-        .highlight-content { padding: 16px; }
-        .highlight-title { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
-        .action-btn { display: block; width: 100%; padding: 10px; margin-top: 10px; background: #8b5cf6; border: none; border-radius: 8px; color: #fff; cursor: pointer; }
-        .history-section { margin-top: 60px; }
-        .history-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-        .history-card { background: #15151f; border-radius: 14px; padding: 16px; cursor: pointer; }
-        .history-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
-        .history-date { font-size: 12px; color: #888; }
-        .status-badge { display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; margin-left: 8px; }
-        .status-processing { background: #f59e0b; color: #000; }
-        .status-completed { background: #10b981; color: #fff; }
-        input[type="file"] { display: none; }
-        @media (max-width: 768px) { .upload-grid, .metrics-grid, .highlights-grid, .history-grid { grid-template-columns: 1fr; } }
+        body { font-family: Arial; background: #0a0a0f; color: #fff; padding: 20px; }
+        .box { max-width: 400px; margin: 50px auto; padding: 30px; background: #15151f; border-radius: 10px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; background: #1a1a25; border: 1px solid #8b5cf6; color: #fff; }
+        button { width: 100%; padding: 12px; background: #8b5cf6; border: none; color: #fff; cursor: pointer; border-radius: 8px; }
+        #otp { display: none; }
+        .main { display: none; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <div class="logo"><div class="logo-icon">⚡</div><div class="logo-text">Highlight AI</div></div>
-            <div class="user-bar" id="user-bar"></div>
-        </header>
-        
-        <main>
-            <div class="hero">
-                <h1>Extrahiere die <span class="highlight">perfekten Momente</span></h1>
-                <p>KI-gestützte Video-Analyse</p>
-            </div>
-            
-            <div class="login-box" id="login-box">
-                <h2 style="margin-bottom:24px;text-align:center;">🔐 Anmelden</h2>
-                <input type="email" id="email-input" class="login-input" placeholder="Deine E-Mail-Adresse" />
-                <button type="button" class="login-btn" id="send-btn" onclick="sendCode()">Code senden</button>
-                
-                <div class="otp-section" id="otp-section">
-                    <p style="color:#888;margin-bottom:16px;text-align:center;">Gib den Code ein, den du per E-Mail erhalten hast</p>
-                    <input type="text" id="otp-input" class="otp-input" placeholder="XXXXXX" maxlength="6" />
-                    <button type="button" class="login-btn" id="verify-btn" onclick="verifyCode()">Bestätigen</button>
-                </div>
-            </div>
-            
-            <div id="main-content" style="display:none;">
-                <div class="upload-grid">
-                    <div class="upload-card" onclick="document.getElementById('file').click()">
-                        <div class="upload-card-icon">💾</div><h3>Dateiupload</h3><p>Von deinem Gerät</p>
-                    </div>
-                    <div class="upload-card" id="upload-url">
-                        <div class="upload-card-icon">🔗</div><h3>URL Import</h3><p>Von Web-URL</p>
-                    </div>
-                    <div class="upload-card">
-                        <div class="upload-card-icon">☁️</div><h3>Cloud Import</h3><p>Google Drive, etc.</p>
-                    </div>
-                </div>
-                
-                <input type="file" id="file" accept="video/*" />
-                
-                <div class="progress" id="progress">
-                    <div style="display:flex;justify-content:space-between;margin-bottom:12px;">
-                        <span id="progress-filename"></span>
-                        <span id="progress-status">Wird analysiert...</span>
-                        <span id="progress-percent" style="color:#8b5cf6;">0%</span>
-                    </div>
-                    <div class="progress-fill" id="progress-fill"></div>
-                </div>
-                
-                <div class="dashboard" id="dashboard">
-                    <div class="metrics-grid">
-                        <div class="metric-card"><div class="metric-title">Pixel</div><div class="metric-value" id="m-pixel">0%</div></div>
-                        <div class="metric-card"><div class="metric-title">Bewegung</div><div class="metric-value" id="m-motion">0%</div></div>
-                        <div class="metric-card"><div class="metric-title">Helligkeit</div><div class="metric-value" id="m-brightness">0%</div></div>
-                        <div class="metric-card"><div class="metric-title">Kontrast</div><div class="metric-value" id="m-contrast">0%</div></div>
-                        <div class="metric-card"><div class="metric-title">Szenen</div><div class="metric-value" id="m-scene">0%</div></div>
-                        <div class="metric-card"><div class="metric-title">Dauer</div><div class="metric-value" id="m-duration">0s</div></div>
-                    </div>
-                    <h2 style="margin-bottom:20px;">Highlights</h2>
-                    <div class="highlights-grid" id="highlights-grid"></div>
-                </div>
-                
-                <div class="history-section">
-                    <h2>📺 Meine Videos</h2>
-                    <div class="history-grid" id="history-grid"></div>
-                </div>
-            </div>
-        </main>
+    <h1 style="text-align:center;">Highlight AI</h1>
+    
+    <div class="box" id="login">
+        <h2>Login</h2>
+        <input type="email" id="email" placeholder="E-Mail">
+        <button onclick="send()">Code senden</button>
+        <div id="otp">
+            <input type="text" id="code" placeholder="Code">
+            <button onclick="verify()">Bestätigen</button>
+        </div>
     </div>
     
-<script type="text/javascript">
-        var user = null;
-        var currentVideoId = null;
-        
-        function sendCode() {
-            var email = document.getElementById('email-input').value;
-            if (!email || email.indexOf('@') === -1) { 
-                alert('Bitte E-Mail eingeben'); 
-                return; 
+    <div class="main" id="main">
+        <h2>Willkommen <span id="useremail"></span></h2>
+        <button onclick="logout()">Abmelden</button>
+        <h3>Video hochladen:</h3>
+        <input type="file" id="file" onchange="upload()">
+        <div id="status"></div>
+    </div>
+
+    <script>
+    function send() {
+        var e = document.getElementById('email').value;
+        if(e.indexOf('@') === -1) { alert('E-Mail eingeben'); return; }
+        var c = Math.floor(100000 + Math.random() * 900000);
+        localStorage.setItem('code', c);
+        localStorage.setItem('email', e);
+        document.getElementById('otp').style.display = 'block';
+        alert('Dein Code: ' + c);
+    }
+    function verify() {
+        var i = document.getElementById('code').value;
+        if(i == localStorage.getItem('code')) {
+            document.getElementById('login').style.display = 'none';
+            document.getElementById('main').style.display = 'block';
+            document.getElementById('useremail').innerText = localStorage.getItem('email');
+        } else {
+            alert('Falscher Code');
+        }
+    }
+    function logout() {
+        localStorage.clear();
+        location.reload();
+    }
+    function upload() {
+        var f = document.getElementById('file').files[0];
+        if(!f) return;
+        document.getElementById('status').innerText = 'Wird hochgeladen...';
+        var fd = new FormData();
+        fd.append('file', f);
+        fd.append('email', localStorage.getItem('email'));
+        var x = new XMLHttpRequest();
+        x.upload.onprogress = function(e) {
+            if(e.lengthComputable) {
+                document.getElementById('status').innerText = Math.round(e.loaded/e.total*100) + '%';
             }
-            var code = Math.floor(100000 + Math.random() * 900000).toString();
-            localStorage.setItem('verify_code', code);
-            localStorage.setItem('verify_email', email);
-            document.getElementById('otp-section').style.display = 'block';
-            document.getElementById('send-btn').textContent = 'Code gesendet!';
-            alert('Demo: Dein Code ist ' + code);
-        }
-        
-        function verifyCode() {
-            var inputCode = document.getElementById('otp-input').value;
-            var storedCode = localStorage.getItem('verify_code');
-            var email = localStorage.getItem('verify_email');
-            
-            if (inputCode === storedCode) {
-                user = {email: email};
-                localStorage.setItem('user_email', email);
-                showLoggedIn();
-            } else {
-                alert('Falscher Code!');
+        };
+        x.onload = function() {
+            if(x.status === 200) {
+                document.getElementById('status').innerText = 'Hochgeladen! Video wird analysiert...';
             }
-        }
-        
-        function logout() {
-            localStorage.clear();
-            user = null;
-            location.reload();
-        }
-        
-        function showLoggedIn() {
-            document.getElementById('login-box').style.display = 'none';
-            document.getElementById('main-content').style.display = 'block';
-            document.getElementById('user-bar').innerHTML = '<span class="user-email">' + user.email + '</span><button class="logout-btn" onclick="logout()">Abmelden</button>';
-            loadHistory();
-        }
-        
-        function loadHistory() {
-            var xhr = new XMLHttpRequest();
-            xhr.open('GET', '/api/history/' + user.email, true);
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4 && xhr.status === 200) {
-                    var videos = JSON.parse(xhr.responseText);
-                    var grid = document.getElementById('history-grid');
-                    if (videos.length === 0) {
-                        grid.innerHTML = '<p style="color:#888;">Noch keine Videos</p>';
-                    } else {
-                        var html = '';
-                        for (var i = 0; i < videos.length; i++) {
-                            var v = videos[i];
-                            var card = document.createElement('div');
-                            card.className = 'history-card';
-                            card.setAttribute('data-id', v.id);
-                            card.onclick = function() { loadVideo(this.getAttribute('data-id')); };
-                            card.innerHTML = '<div class="history-title">' + v.filename + '</div><div class="history-date">' + v.date + '</div>';
-                            grid.appendChild(card);
-                        }
-                    }
-                }
-            };
-            xhr.send();
-        }
-        
-        function loadVideo(vid) {
-            currentVideoId = vid;
-            document.getElementById('dashboard').classList.add('active');
-            loadHighlights(vid);
-        }
-        
-        function handleFile(e) {
-            var file = e.target.files[0];
-            if (!file) return;
-            
-            document.getElementById('progress').classList.add('active');
-            document.getElementById('progress-filename').textContent = file.name;
-            
-            var formData = new FormData();
-            formData.append('file', file);
-            formData.append('email', user.email);
-            
-            var xhr = new XMLHttpRequest();
-            xhr.upload.onprogress = function(evt) {
-                if (evt.lengthComputable) {
-                    var percent = Math.round((evt.loaded / evt.total) * 100);
-                    document.getElementById('progress-percent').textContent = percent + '%';
-                    document.getElementById('progress-fill').style.width = percent + '%';
-                    if (percent === 100) {
-                        document.getElementById('progress-status').textContent = 'Wird analysiert...';
-                    }
-                }
-            };
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4 && xhr.status === 200) {
-                    var data = JSON.parse(xhr.responseText);
-                    currentVideoId = data.video_id;
-                    var pollInt = setInterval(function() {
-                        var pollXhr = new XMLHttpRequest();
-                        pollXhr.open('GET', '/api/video/' + currentVideoId, true);
-                        pollXhr.onreadystatechange = function() {
-                            if (pollXhr.readyState === 4 && pollXhr.status === 200) {
-                                var v = JSON.parse(pollXhr.responseText);
-                                if (v.status === 'completed') {
-                                    clearInterval(pollInt);
-                                    document.getElementById('progress').classList.remove('active');
-                                    loadHighlights(currentVideoId);
-                                    loadHistory();
-                                }
-                            }
-                        };
-                        pollXhr.send();
-                    }, 2000);
-                }
-            };
-            xhr.open('POST', '/api/upload');
-            xhr.send(formData);
-        }
-        
-        function loadHighlights(vid) {
-            var xhr = new XMLHttpRequest();
-            xhr.open('GET', '/api/video/' + vid, true);
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4 && xhr.status === 200) {
-                    var data = JSON.parse(xhr.responseText);
-                    document.getElementById('dashboard').classList.add('active');
-                    
-                    if (data.metrics) {
-                        document.getElementById('m-pixel').textContent = (data.metrics.pixel || 0) + '%';
-                        document.getElementById('m-motion').textContent = (data.metrics.motion || 0) + '%';
-                        document.getElementById('m-brightness').textContent = (data.metrics.brightness || 0) + '%';
-                        document.getElementById('m-contrast').textContent = (data.metrics.contrast || 0) + '%';
-                        document.getElementById('m-scene').textContent = (data.metrics.scene || 0) + '%';
-                        document.getElementById('m-duration').textContent = (data.metrics.duration || 0) + 's';
-                    }
-                    
-                    var grid = document.getElementById('highlights-grid');
-                    if (data.highlights && data.highlights.length > 0) {
-                        var html = '';
-                        for (var i = 0; i < data.highlights.length; i++) {
-                            var h = data.highlights[i];
-                            var dur = h.end_time - h.start_time;
-                            var min = Math.floor(dur / 60);
-                            var sec = Math.floor(dur % 60);
-                            var secStr = sec < 10 ? '0' + sec : sec;
-                            html += '<div class="highlight-card"><div class="highlight-video"><div style="font-size:40px;">&#9654;</div><div class="highlight-duration">' + min + ':' + secStr + '</div><div class="highlight-score">Score: ' + h.score + '</div></div><div class="highlight-content"><div class="highlight-title">' + h.title + '</div><button class="action-btn">&#x2B07; Download</button></div></div>';
-                        }
-                        grid.innerHTML = html;
-                    } else {
-                        grid.innerHTML = '<p style="color:#888;">Keine Highlights gefunden</p>';
-                    }
-                }
-            };
-            xhr.send();
-        }
-        
-        function showUrlInput() {
-            var url = prompt('Video URL:');
-            if (url) {
-                alert('URL-Upload coming soon!');
-            }
-        }
-        
-        document.getElementById('upload-url').addEventListener('click', showUrlInput);
-        document.getElementById('file').addEventListener('change', handleFile);
-        
-        var savedEmail = localStorage.getItem('user_email');
-        if (savedEmail) {
-            user = {email: savedEmail};
-            showLoggedIn();
-        }
+        };
+        x.open('POST', '/api/upload');
+        x.send(fd);
+    }
+    var saved = localStorage.getItem('email');
+    if(saved) {
+        document.getElementById('login').style.display = 'none';
+        document.getElementById('main').style.display = 'block';
+        document.getElementById('useremail').innerText = saved;
+    }
     </script>
 </body>
 </html>'''
