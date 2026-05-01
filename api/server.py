@@ -289,7 +289,7 @@ HTML = '''<!DOCTYPE html>
         </main>
     </div>
     
-<script>
+<script type="text/javascript">
         var user = null;
         var currentVideoId = null;
         
@@ -335,26 +335,29 @@ HTML = '''<!DOCTYPE html>
         }
         
         function loadHistory() {
-            fetch('/api/history/' + user.email)
-            .then(function(r) { return r.json(); })
-            .then(function(videos) {
-                var grid = document.getElementById('history-grid');
-                if (videos.length === 0) {
-                    grid.innerHTML = '<p style="color:#888;">Noch keine Videos</p>';
-                } else {
-                    var html = '';
-                    for (var i = 0; i < videos.length; i++) {
-                        html += '<div class="history-card" data-id="' + videos[i].id + '"><div class="history-title">' + videos[i].filename + '</div><div class="history-date">' + videos[i].date + '</div></div>';
-                    }
-                    grid.innerHTML = html;
-                    var cards = document.querySelectorAll('.history-card');
-                    for (var j = 0; j < cards.length; j++) {
-                        cards[j].addEventListener('click', function() {
-                            loadVideo(this.getAttribute('data-id'));
-                        });
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/history/' + user.email, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    var videos = JSON.parse(xhr.responseText);
+                    var grid = document.getElementById('history-grid');
+                    if (videos.length === 0) {
+                        grid.innerHTML = '<p style="color:#888;">Noch keine Videos</p>';
+                    } else {
+                        var html = '';
+                        for (var i = 0; i < videos.length; i++) {
+                            var v = videos[i];
+                            var card = document.createElement('div');
+                            card.className = 'history-card';
+                            card.setAttribute('data-id', v.id);
+                            card.onclick = function() { loadVideo(this.getAttribute('data-id')); };
+                            card.innerHTML = '<div class="history-title">' + v.filename + '</div><div class="history-date">' + v.date + '</div>';
+                            grid.appendChild(card);
+                        }
                     }
                 }
-            });
+            };
+            xhr.send();
         }
         
         function loadVideo(vid) {
@@ -385,21 +388,25 @@ HTML = '''<!DOCTYPE html>
                     }
                 }
             };
-            xhr.onload = function() {
-                if (xhr.status === 200) {
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.status === 200) {
                     var data = JSON.parse(xhr.responseText);
                     currentVideoId = data.video_id;
                     var pollInt = setInterval(function() {
-                        fetch('/api/video/' + currentVideoId)
-                        .then(function(r) { return r.json(); })
-                        .then(function(v) {
-                            if (v.status === 'completed') {
-                                clearInterval(pollInt);
-                                document.getElementById('progress').classList.remove('active');
-                                loadHighlights(currentVideoId);
-                                loadHistory();
+                        var pollXhr = new XMLHttpRequest();
+                        pollXhr.open('GET', '/api/video/' + currentVideoId, true);
+                        pollXhr.onreadystatechange = function() {
+                            if (pollXhr.readyState === 4 && pollXhr.status === 200) {
+                                var v = JSON.parse(pollXhr.responseText);
+                                if (v.status === 'completed') {
+                                    clearInterval(pollInt);
+                                    document.getElementById('progress').classList.remove('active');
+                                    loadHighlights(currentVideoId);
+                                    loadHistory();
+                                }
                             }
-                        });
+                        };
+                        pollXhr.send();
                     }, 2000);
                 }
             };
@@ -408,35 +415,40 @@ HTML = '''<!DOCTYPE html>
         }
         
         function loadHighlights(vid) {
-            fetch('/api/video/' + vid)
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                document.getElementById('dashboard').classList.add('active');
-                
-                if (data.metrics) {
-                    document.getElementById('m-pixel').textContent = (data.metrics.pixel || 0) + '%';
-                    document.getElementById('m-motion').textContent = (data.metrics.motion || 0) + '%';
-                    document.getElementById('m-brightness').textContent = (data.metrics.brightness || 0) + '%';
-                    document.getElementById('m-contrast').textContent = (data.metrics.contrast || 0) + '%';
-                    document.getElementById('m-scene').textContent = (data.metrics.scene || 0) + '%';
-                    document.getElementById('m-duration').textContent = (data.metrics.duration || 0) + 's';
-                }
-                
-                var grid = document.getElementById('highlights-grid');
-                if (data.highlights && data.highlights.length > 0) {
-                    var html = '';
-                    for (var i = 0; i < data.highlights.length; i++) {
-                        var h = data.highlights[i];
-                        var dur = h.end_time - h.start_time;
-                        var min = Math.floor(dur / 60);
-                        var sec = Math.floor(dur % 60);
-                        html += '<div class="highlight-card"><div class="highlight-video"><div style="font-size:40px;">▶</div><div class="highlight-duration">' + min + ':' + (sec < 10 ? '0' : '') + sec + '</div><div class="highlight-score">Score: ' + h.score + '</div></div><div class="highlight-content"><div class="highlight-title">' + h.title + '</div><button class="action-btn">⬇️ Download</button></div></div>';
+            var xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/video/' + vid, true);
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4 && xhr.status === 200) {
+                    var data = JSON.parse(xhr.responseText);
+                    document.getElementById('dashboard').classList.add('active');
+                    
+                    if (data.metrics) {
+                        document.getElementById('m-pixel').textContent = (data.metrics.pixel || 0) + '%';
+                        document.getElementById('m-motion').textContent = (data.metrics.motion || 0) + '%';
+                        document.getElementById('m-brightness').textContent = (data.metrics.brightness || 0) + '%';
+                        document.getElementById('m-contrast').textContent = (data.metrics.contrast || 0) + '%';
+                        document.getElementById('m-scene').textContent = (data.metrics.scene || 0) + '%';
+                        document.getElementById('m-duration').textContent = (data.metrics.duration || 0) + 's';
                     }
-                    grid.innerHTML = html;
-                } else {
-                    grid.innerHTML = '<p style="color:#888;">Keine Highlights gefunden</p>';
+                    
+                    var grid = document.getElementById('highlights-grid');
+                    if (data.highlights && data.highlights.length > 0) {
+                        var html = '';
+                        for (var i = 0; i < data.highlights.length; i++) {
+                            var h = data.highlights[i];
+                            var dur = h.end_time - h.start_time;
+                            var min = Math.floor(dur / 60);
+                            var sec = Math.floor(dur % 60);
+                            var secStr = sec < 10 ? '0' + sec : sec;
+                            html += '<div class="highlight-card"><div class="highlight-video"><div style="font-size:40px;">&#9654;</div><div class="highlight-duration">' + min + ':' + secStr + '</div><div class="highlight-score">Score: ' + h.score + '</div></div><div class="highlight-content"><div class="highlight-title">' + h.title + '</div><button class="action-btn">&#x2B07; Download</button></div></div>';
+                        }
+                        grid.innerHTML = html;
+                    } else {
+                        grid.innerHTML = '<p style="color:#888;">Keine Highlights gefunden</p>';
+                    }
                 }
-            });
+            };
+            xhr.send();
         }
         
         function showUrlInput() {
