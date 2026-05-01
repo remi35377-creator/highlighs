@@ -8,12 +8,70 @@ import uuid
 from datetime import datetime
 import threading
 import json
+import sqlite3
 
 app = Flask(__name__)
 CORS(app)
 
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# SQLite Database für persistente Speicherung
+DB_FILE = 'videos.db'
+
+def init_db():
+    """Datenbank initialisieren"""
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS videos (
+        id TEXT PRIMARY KEY,
+        email TEXT,
+        filename TEXT,
+        date TEXT,
+        status TEXT,
+        metrics TEXT,
+        highlights TEXT
+    )''')
+    conn.commit()
+    conn.close()
+
+def save_video(video_id, data):
+    """Video in Datenbank speichern"""
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('''INSERT OR REPLACE INTO videos (id, email, filename, date, status, metrics, highlights)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)''',
+              (video_id, data.get('email'), data.get('filename'), data.get('date'),
+               data.get('status'), json.dumps(data.get('metrics')), json.dumps(data.get('highlights'))))
+    conn.commit()
+    conn.close()
+
+def get_video(video_id):
+    """Video aus Datenbank holen"""
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('SELECT * FROM videos WHERE id = ?', (video_id,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        return {
+            'id': row[0], 'email': row[1], 'filename': row[2], 'date': row[3],
+            'status': row[4], 'metrics': json.loads(row[5]) if row[5] else None,
+            'highlights': json.loads(row[6]) if row[6] else []
+        }
+    return None
+
+def get_user_videos(email):
+    """Alle Videos eines Users holen"""
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute('SELECT id, filename, date, status FROM videos WHERE email = ? ORDER BY date DESC', (email,))
+    rows = c.fetchall()
+    conn.close()
+    return [{'id': r[0], 'filename': r[1], 'date': r[2], 'status': r[3]} for r in rows]
+
+# Datenbank initialisieren
+init_db()
 
 # Echte Video-Analyse-Funktionen
 def analyze_video_metrics(video_path):
@@ -274,26 +332,23 @@ def process_video_async(video_id, video_path, email):
             print(f">>> Found {len(highlights)} highlights")
             
             # Ergebnisse speichern
-            videos_db[video_id] = {
+            save_video(video_id, {
                 'email': email,
                 'filename': os.path.basename(video_path),
                 'date': datetime.now().isoformat(),
                 'status': 'completed',
                 'metrics': metrics,
                 'highlights': highlights
-            }
+            })
             print(f">>> Video processing COMPLETED!")
         else:
             print(">>> Metrics returned None - marking as failed")
-            videos_db[video_id]['status'] = 'failed'
+            save_video(video_id, {'email': email, 'filename': os.path.basename(video_path), 'date': datetime.now().isoformat(), 'status': 'failed'})
     except Exception as e:
         print(f">>> ERROR processing video: {e}")
         import traceback
         traceback.print_exc()
-        videos_db[video_id]['status'] = 'failed'
-
-# In-Memory Database
-videos_db = {}
+        save_video(video_id, {'email': email, 'filename': os.path.basename(video_path), 'date': datetime.now().isoformat(), 'status': 'failed'})
 
 HTML = '''<!DOCTYPE html>
 <html>
@@ -689,12 +744,12 @@ def upload():
         print(f"Upload failed: {e}")
         return jsonify({'error': f'Upload fehlgeschlagen: {str(e)}'}), 500
     
-    videos_db[video_id] = {
+    save_video(video_id, {
         'email': email,
         'filename': filename,
         'date': datetime.now().isoformat(),
         'status': 'processing'
-    }
+    })
     
     print("Starting async video processing...")
     # Video im Hintergrund analysieren
@@ -703,10 +758,10 @@ def upload():
     return jsonify({'video_id': video_id, 'status': 'processing'})
 
 @app.route('/api/video/<vid>')
-def get_video(vid):
-    if vid not in videos_db:
+def get_video_api(vid):
+    v = get_video(vid)
+    if not v:
         return jsonify({'error': 'Not found'}), 404
-    v = videos_db[vid]
     return jsonify({
         'id': vid,
         'filename': v['filename'],
@@ -718,8 +773,7 @@ def get_video(vid):
 @app.route('/api/history/<email>')
 def history(email):
     email = email.lower()
-    videos = [{'id': vid, 'filename': v['filename'], 'date': v['date'][:10], 'status': v.get('status', 'processing')} 
-             for vid, v in videos_db.items() if v.get('email', '').lower() == email]
+    videos = get_user_videos(email)
     return jsonify(videos)
 
 if __name__ == '__main__':
