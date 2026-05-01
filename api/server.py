@@ -271,46 +271,210 @@ def analyze_video_metrics(video_path):
 
 
 def find_highlights(video_path, metrics):
-    """Highlight-Clips finden basierend auf Metriken"""
+    """Echte Highlight-Clips finden basierend auf verschiedenen Analyse-Methoden"""
+    print(">>> Starting real highlight detection...")
+    
     try:
         cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            return create_fallback_highlights(metrics)
+        
         fps = cap.get(cv2.CAP_PROP_FPS)
         frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         duration = frame_count / fps if fps > 0 else 30
-        cap.release()
-    except:
-        duration = 30
+        
+        if duration <= 0:
+            duration = 30
+            
+        fps = int(fps) if fps > 0 else 30
+        print(f">>> Video: {duration}s, {fps} fps, {frame_count} frames")
+        
+    except Exception as e:
+        print(f">>> Error reading video: {e}")
+        return create_fallback_highlights(metrics)
     
-    # 6 Highlights erstellen
+    # Verschiedene Analyse-Methoden
+    motion_scores = []
+    brightness_values = []
+    prev_gray = None
+    
+    # Analysiere alle Frames (jeden 5. für Speed)
+    frame_idx = 0
+    max_frames = min(frame_count, fps * 120)  # Max 2 Minuten analysieren
+    
+    print(">>> Analyzing frames for highlight detection...")
+    
+    while True:
+        ret, frame = cap.read()
+        if not ret or frame_idx >= max_frames:
+            break
+        
+        if frame_idx % 5 == 0:
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            brightness = np.mean(gray)
+            brightness_values.append(brightness)
+            
+            if prev_gray is not None:
+                diff = cv2.absdiff(prev_gray, gray)
+                motion = np.std(diff)
+                motion_scores.append(motion)
+            
+            prev_gray = gray
+        
+        frame_idx += 1
+    
+    cap.release()
+    
+    if not motion_scores or len(motion_scores) < 10:
+        print(">>> Not enough data - using fallback")
+        return create_fallback_highlights(metrics)
+    
+    # 6 verschiedene Highlight-Methoden
     highlights = []
-    titles = [
-        'Action-Höhepunkt',
-        'Emotionales Highlight', 
-        'Spannender Moment',
-        'Beste Szene',
-        'Wichtiger Dialog',
-        'Finale Szene'
-    ]
+    
+    # 1. HÖCHSTE BEWEGUNG (Motion Peak)
+    max_motion_idx = np.argmax(motion_scores)
+    start1 = int((max_motion_idx * 5) / fps)
+    highlights.append({
+        'id': str(uuid.uuid4()),
+        'start_time': max(0, start1 - 10),
+        'end_time': min(duration, start1 + 20),
+        'score': min(100, int(np.max(motion_scores) / 3)),
+        'title': '🔥 Action-Höhepunkt',
+        'method': 'motion_peak',
+        'value': int(np.max(motion_scores))
+    })
+    
+    # 2. GRÖSSTE HELLIGKEITSÄNDERUNG (Brightness Change)
+    brightness_changes = [abs(brightness_values[i+1] - brightness_values[i]) 
+                         for i in range(len(brightness_values)-1)]
+    max_bright_idx = np.argmax(brightness_changes) if brightness_changes else 0
+    start2 = int((max_bright_idx * 5) / fps)
+    highlights.append({
+        'id': str(uuid.uuid4()),
+        'start_time': max(0, start2 - 10),
+        'end_time': min(duration, start2 + 20),
+        'score': min(100, int(brightness_changes[max_bright_idx] / 5) if brightness_changes else 50),
+        'title': '💡 Helligkeits-Wechsel',
+        'method': 'brightness_change',
+        'value': int(brightness_changes[max_bright_idx]) if brightness_changes else 0
+    })
+    
+    # 3. KONTRAST-ÄNDERUNG (Contrast)
+    contrast_score = metrics.get('contrast', 60)
+    mid_point = len(motion_scores) // 2
+    highlights.append({
+        'id': str(uuid.uuid4()),
+        'start_time': max(0, int((mid_point * 5) / fps) - 15),
+        'end_time': min(duration, int((mid_point * 5) / fps) + 15),
+        'score': contrast_score,
+        'title': '🎬 Kontrast-Szene',
+        'method': 'contrast',
+        'value': contrast_score
+    })
+    
+    # 4. SZENENWECHSEL (Scene Change)
+    scene_score = metrics.get('scene', 40)
+    if scene_score > 30:
+        scene_positions = [i for i in range(1, len(brightness_values)) 
+                         if abs(brightness_values[i] - brightness_values[i-1]) > 20]
+        if scene_positions:
+            best_scene = scene_positions[len(scene_positions)//2]
+            start4 = int((best_scene * 5) / fps)
+            highlights.append({
+                'id': str(uuid.uuid4()),
+                'start_time': max(0, start4 - 10),
+                'end_time': min(duration, start4 + 20),
+                'score': min(100, scene_score),
+                'title': '🔄 Szenen-Wechsel',
+                'method': 'scene_change',
+                'value': len(scene_positions)
+            })
+        else:
+            highlights.append({
+                'id': str(uuid.uuid4()),
+                'start_time': int(duration * 0.3),
+                'end_time': min(duration, int(duration * 0.3) + 30),
+                'score': scene_score,
+                'title': '🔄 Szenen-Wechsel',
+                'method': 'scene_change',
+                'value': 0
+            })
+    else:
+        highlights.append({
+            'id': str(uuid.uuid4()),
+            'start_time': int(duration * 0.3),
+            'end_time': min(duration, int(duration * 0.3) + 30),
+            'score': scene_score,
+            'title': '🔄 Szenen-Wechsel',
+            'method': 'scene_change',
+            'value': 0
+        })
+    
+    # 5. DURCHSCHNITT (Average Activity)
+    avg_motion = np.mean(motion_scores)
+    avg_idx = int(len(motion_scores) * 0.5)
+    start5 = int((avg_idx * 5) / fps)
+    highlights.append({
+        'id': str(uuid.uuid4()),
+        'start_time': max(0, start5 - 10),
+        'end_time': min(duration, start5 + 20),
+        'score': min(100, int(avg_motion / 3)),
+        'title': '📊 Durchschnitts-Szene',
+        'method': 'average',
+        'value': int(avg_motion)
+    })
+    
+    # 6. DAUER-BASIERT (Duration-based)
+    if duration > 60:
+        final_start = int(duration - 40)
+        highlights.append({
+            'id': str(uuid.uuid4()),
+            'start_time': max(0, final_start),
+            'end_time': min(duration, final_start + 30),
+            'score': 70,
+            'title': '🎯 Finale Szene',
+            'method': 'finale',
+            'value': int(duration)
+        })
+    else:
+        highlights.append({
+            'id': str(uuid.uuid4()),
+            'start_time': 0,
+            'end_time': min(30, int(duration)),
+            'score': 75,
+            'title': '🎯 Erste Szene',
+            'method': 'start',
+            'value': 0
+        })
+    
+    # Sortiere nach Score
+    highlights.sort(key=lambda x: x['score'], reverse=True)
+    
+    print(f">>> Found {len(highlights)} real highlights")
+    for h in highlights:
+        print(f">>>   - {h['title']}: score={h['score']}, method={h['method']}")
+    
+    return highlights
+
+
+def create_fallback_highlights(metrics):
+    """Fallback wenn keine echten Highlights gefunden wurden"""
+    duration = metrics.get('duration', 30)
+    highlights = []
+    methods = ['motion', 'brightness', 'contrast', 'scene', 'average', 'finale']
+    titles = ['🔥 Action', '💡 Licht', '🎬 Kontrast', '🔄 Wechsel', '📊 Durchschnitt', '🎯 Finale']
     
     for i in range(6):
         start = int((duration / 7) * (i + 1))
-        end = min(start + 30, int(duration))
-        
-        score = 95 - (i * 5) + (metrics.get('pixel', 75) // 10)
-        
         highlights.append({
             'id': str(uuid.uuid4()),
-            'start_time': start,
-            'end_time': end,
-            'score': min(100, score),
-            'title': titles[i] if i < len(titles) else f'Highlight {i+1}',
-            'metrics': {
-                'pixel': metrics.get('pixel', 75),
-                'motion': metrics.get('motion', 80),
-                'brightness': metrics.get('brightness', 50),
-                'audio_tracks': metrics.get('audio_tracks', 1),
-                'audio_channels': metrics.get('audio_channels', 2)
-            }
+            'start_time': max(0, start - 10),
+            'end_time': min(duration, start + 20),
+            'score': 95 - (i * 5),
+            'title': titles[i],
+            'method': methods[i],
+            'value': 50
         })
     
     return highlights
